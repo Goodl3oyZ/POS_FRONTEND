@@ -28,8 +28,9 @@ export function MenuCard({ item, onAddToCart }: MenuCardProps) {
         <Image
           src={item.image}
           alt={item.name}
-          fill
-          className="object-cover"
+          width={400}
+          height={300}
+          className="object-cover w-full h-full"
           priority
         />
         <Badge className="absolute top-2 right-2 bg-white/90 text-gray-800 hover:bg-white/90">

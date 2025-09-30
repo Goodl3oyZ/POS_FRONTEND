@@ -39,7 +39,7 @@ export const menuItems: MenuItem[] = [
     price: 120,
     description:
       "Authentic Thai stir-fried rice noodles with shrimp, tofu, and peanuts",
-    image: "/images/padthai.jpg",
+    image: "/images/foodImageHolder.jpg",
     category: "Main",
   },
   {
@@ -48,7 +48,7 @@ export const menuItems: MenuItem[] = [
     price: 150,
     description:
       "Aromatic Thai green curry with chicken, bamboo shoots, and Thai basil",
-    image: "/images/greencurry.jpg",
+    image: "/images/foodImageHolder.jpg",
     category: "Main",
   },
   {
@@ -56,7 +56,7 @@ export const menuItems: MenuItem[] = [
     name: "Tom Yum Goong",
     price: 180,
     description: "Spicy and sour soup with prawns, mushrooms, and lemongrass",
-    image: "/images/tomyum.jpg",
+    image: "/images/foodImageHolder.jpg",
     category: "Soup",
   },
   {
@@ -64,7 +64,7 @@ export const menuItems: MenuItem[] = [
     name: "Som Tam",
     price: 90,
     description: "Spicy green papaya salad with peanuts and dried shrimp",
-    image: "/images/somtam.jpg",
+    image: "/images/foodImageHolder.jpg",
     category: "Appetizer",
   },
   {
@@ -72,7 +72,7 @@ export const menuItems: MenuItem[] = [
     name: "Mango Sticky Rice",
     price: 100,
     description: "Sweet ripe mango with coconut sticky rice and coconut cream",
-    image: "/images/mango.jpg",
+    image: "/images/foodImageHolder.jpg",
     category: "Dessert",
   },
 ];

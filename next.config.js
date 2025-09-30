@@ -3,6 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   images: {
+    unoptimized: true,
+    domains: ["localhost"],
     remotePatterns: [
       {
         protocol: "https",
