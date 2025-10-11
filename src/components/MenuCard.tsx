@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { formatPrice } from "@/lib/utils";
+import { useCart } from "@/lib/cart-context";
 
 interface MenuItem {
   id: number;

@@ -1,4 +1,4 @@
-// Types and Interfaces
+// ------------------ TYPES ------------------
 export interface MenuItem {
   id: number;
   name: string;
@@ -6,6 +6,18 @@ export interface MenuItem {
   description: string;
   image: string;
   category: string;
+  options?: MenuOption[];
+  extras?: ExtraItem[]; // เพิ่มตรงนี้
+}
+
+export interface MenuOption {
+  name: string;
+  choices: { label: string; price: number }[];
+}
+
+export interface ExtraItem {
+  label: string;
+  price: number;
 }
 
 export interface OrderItem {
@@ -31,7 +43,25 @@ export interface Table {
   currentOrder?: Order;
 }
 
-// Menu items data
+export interface BillItem {
+  name: string;
+  qty: number;
+  price: number;
+}
+
+export interface Bill {
+  id: string;
+  time: string;
+  total: number;
+  method: "Cash" | "QR";
+  serviceCharge: number;
+  vat: number;
+  subTotal: number;
+  items: BillItem[];
+  tableId: string;
+}
+
+// ------------------ MENU ITEMS ------------------
 export const menuItems: MenuItem[] = [
   {
     id: 1,
@@ -41,15 +71,58 @@ export const menuItems: MenuItem[] = [
       "Authentic Thai stir-fried rice noodles with shrimp, tofu, and peanuts",
     image: "/images/foodImageHolder.jpg",
     category: "Main",
+    options: [
+      {
+        name: "Protein",
+        choices: [
+          { label: "Shrimp", price: 0 },
+          { label: "Chicken", price: -10 },
+          { label: "Tofu", price: -20 },
+        ],
+      },
+      {
+        name: "Spiciness",
+        choices: [
+          { label: "Mild", price: 0 },
+          { label: "Medium", price: 0 },
+          { label: "Hot", price: 0 },
+        ],
+      },
+    ],
+    extras: [
+      { label: "Cheese", price: 10 },
+      { label: "Egg", price: 15 },
+      { label: "Bacon", price: 25 },
+    ],
   },
   {
     id: 2,
     name: "Green Curry",
-    price: 150,
-    description:
-      "Aromatic Thai green curry with chicken, bamboo shoots, and Thai basil",
+    price: 130,
+    description: "Thai green curry with vegetables and your choice of protein",
     image: "/images/foodImageHolder.jpg",
     category: "Main",
+    options: [
+      {
+        name: "Protein",
+        choices: [
+          { label: "Chicken", price: 0 },
+          { label: "Tofu", price: -10 },
+        ],
+      },
+      {
+        name: "Spiciness",
+        choices: [
+          { label: "Mild", price: 0 },
+          { label: "Medium", price: 0 },
+          { label: "Hot", price: 0 },
+        ],
+      },
+    ],
+    extras: [
+      { label: "Basil", price: 5 },
+      { label: "Extra Coconut Milk", price: 20 },
+    ],
   },
   {
     id: 3,
@@ -58,6 +131,27 @@ export const menuItems: MenuItem[] = [
     description: "Spicy and sour soup with prawns, mushrooms, and lemongrass",
     image: "/images/foodImageHolder.jpg",
     category: "Soup",
+    options: [
+      {
+        name: "Spiciness",
+        choices: [
+          { label: "Mild", price: 0 },
+          { label: "Medium", price: 0 },
+          { label: "Extra Hot", price: 10 },
+        ],
+      },
+      {
+        name: "Add-ons",
+        choices: [
+          { label: "Extra Shrimp", price: 30 },
+          { label: "Mushrooms", price: 10 },
+        ],
+      },
+    ],
+    extras: [
+      { label: "Lime", price: 5 },
+      { label: "Cilantro", price: 5 },
+    ],
   },
   {
     id: 4,
@@ -75,11 +169,34 @@ export const menuItems: MenuItem[] = [
     image: "/images/foodImageHolder.jpg",
     category: "Dessert",
   },
+  {
+    id: 6,
+    name: "Thai Ice Tea",
+    price: 50,
+    description: "Refreshing Thai iced tea with milk and sugar",
+    image: "/images/foodImageHolder.jpg",
+    category: "Drink",
+  },
+  {
+    id: 7,
+    name: "Thai Coffee",
+    price: 60,
+    description: "Strong Thai-style coffee served over ice or hot",
+    image: "/images/foodImageHolder.jpg",
+    category: "Drink",
+  },
+  {
+    id: 8,
+    name: "Grilled Fish",
+    price: 310,
+    description: "Whole grilled fish seasoned with Thai herbs and chili sauce",
+    image: "/images/foodImageHolder.jpg",
+    category: "Main",
+  },
 ];
 
-// Table data
+// ------------------ TABLES ------------------
 export const tables: Table[] = [
-  // Indoor Zone
   {
     id: "T01",
     zone: "Indoor",
@@ -241,45 +358,44 @@ export const tables: Table[] = [
   },
 ];
 
-// Bill types
-export interface BillItem {
-  name: string;
-  qty: number;
-  price: number;
-}
+// ------------------ ORDERS ------------------
+export const orders: Order[] = [
+  {
+    id: "ORD001",
+    tableId: "T02",
+    items: [
+      { name: "Pad Thai", quantity: 2, price: 120 },
+      { name: "Green Curry", quantity: 1, price: 150 },
+    ],
+    status: "Preparing",
+    total: 390,
+    createdAt: "2025-09-29T10:30:00",
+  },
+  {
+    id: "ORD002",
+    tableId: "G02",
+    items: [
+      { name: "Tom Yum Goong", quantity: 1, price: 180 },
+      { name: "Som Tam", quantity: 2, price: 90 },
+    ],
+    status: "Done",
+    total: 360,
+    createdAt: "2025-09-29T11:15:00",
+  },
+  {
+    id: "ORD003",
+    tableId: "V01",
+    items: [
+      { name: "Green Curry", quantity: 2, price: 150 },
+      { name: "Mango Sticky Rice", quantity: 2, price: 100 },
+    ],
+    status: "Preparing",
+    total: 500,
+    createdAt: "2025-09-29T12:00:00",
+  },
+];
 
-export interface Bill {
-  id: string;
-  time: string;
-  total: number;
-  method: "Cash" | "QR";
-  serviceCharge: number;
-  vat: number;
-  subTotal: number;
-  items: BillItem[];
-  tableId: string;
-}
-
-// Bills types and data
-export interface BillItem {
-  name: string;
-  qty: number;
-  price: number;
-}
-
-export interface Bill {
-  id: string;
-  time: string;
-  total: number;
-  method: "Cash" | "QR";
-  serviceCharge: number;
-  vat: number;
-  subTotal: number;
-  items: BillItem[];
-  tableId: string;
-}
-
-// Bills history data
+// ------------------ BILLS ------------------
 export const bills: Bill[] = [
   {
     id: "B001",
@@ -327,7 +443,7 @@ export const bills: Bill[] = [
   },
 ];
 
-// Current bill for payment page demo
+// ------------------ CURRENT BILL ------------------
 export const currentBill: Bill = {
   id: "B004",
   time: new Date().toISOString(),
@@ -344,40 +460,3 @@ export const currentBill: Bill = {
     { name: "Thai Ice Tea", qty: 4, price: 50 },
   ],
 };
-
-// Orders data
-export const orders: Order[] = [
-  {
-    id: "ORD001",
-    tableId: "T02",
-    items: [
-      { name: "Pad Thai", quantity: 2, price: 120 },
-      { name: "Green Curry", quantity: 1, price: 150 },
-    ],
-    status: "Preparing",
-    total: 390,
-    createdAt: "2025-09-29T10:30:00",
-  },
-  {
-    id: "ORD002",
-    tableId: "T03",
-    items: [
-      { name: "Tom Yum Goong", quantity: 1, price: 180 },
-      { name: "Som Tam", quantity: 2, price: 90 },
-    ],
-    status: "Done",
-    total: 360,
-    createdAt: "2025-09-29T10:15:00",
-  },
-  {
-    id: "ORD003",
-    tableId: "T06",
-    items: [
-      { name: "Green Curry", quantity: 2, price: 150 },
-      { name: "Mango Sticky Rice", quantity: 2, price: 100 },
-    ],
-    status: "Cancelled",
-    total: 500,
-    createdAt: "2025-09-29T10:00:00",
-  },
-];

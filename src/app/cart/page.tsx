@@ -20,13 +20,13 @@ export default function CartPage() {
         name: item.name,
         quantity: item.quantity,
         price: item.price,
+        options: item.options,
       })),
       total,
       status: "Preparing",
       createdAt: new Date().toISOString(),
     };
 
-    // In a real app, we would send this to an API
     console.log("New Order:", newOrder);
     clearCart();
   };
@@ -53,10 +53,12 @@ export default function CartPage() {
       <div className="space-y-4">
         {items.map((item) => (
           <CartItem
-            key={item.id}
+            key={item.uniqueId}
             item={item}
-            onUpdateQuantity={updateQuantity}
-            onRemove={removeItem}
+            onUpdateQuantity={(id, quantity, options) =>
+              updateQuantity(id, quantity, options)
+            }
+            onRemove={(id, options) => removeItem(id, options)}
           />
         ))}
       </div>
