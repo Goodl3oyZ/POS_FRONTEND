@@ -1,7 +1,6 @@
 "use client";
 
-import { Bill, currentBill } from "@/lib/data";
-import { formatPrice } from "@/lib/utils";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -14,8 +13,8 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
 import {
+  AlertCircle,
   CreditCard,
   PocketKnife,
   Printer,
@@ -23,13 +22,111 @@ import {
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { formatPrice } from "@/lib/utils";
 
-export default function PaymentPage() {
-  const [paymentMethod, setPaymentMethod] = useState<Bill["method"]>("Cash");
+type MenuItem = {
+  name: string;
+  price: number;
+  options?: { [key: string]: string[] }; // ex: Protein: ["Chicken", "Shrimp"]
+  extras?: { label: string; price: number }[]; // optional extras
+};
+
+type OrderItem = {
+  menuItem: MenuItem;
+  quantity: number;
+  selectedOptions?: { [key: string]: string };
+  selectedExtras?: { label: string; price: number }[];
+};
+
+type Bill = {
+  tableId: string;
+  items: OrderItem[];
+  subTotal: number;
+  serviceCharge: number;
+  vat: number;
+  total: number;
+  method: "Cash" | "QR";
+};
+
+// เมนูตัวอย่าง
+const menu: MenuItem[] = [
+  {
+    name: "Pad Thai",
+    price: 130,
+    options: {
+      Protein: ["Chicken", "Shrimp", "Tofu"],
+      Spiciness: ["Mild", "Medium", "Hot"],
+    },
+    extras: [
+      { label: "Cheese", price: 20 },
+      { label: "Extra Noodles", price: 30 },
+    ],
+  },
+  {
+    name: "Green Curry",
+    price: 150,
+    options: { Protein: ["Chicken", "Beef"], Spiciness: ["Mild", "Hot"] },
+    extras: [{ label: "Extra Coconut Milk", price: 25 }],
+  },
+  {
+    name: "Thai Ice Tea",
+    price: 50,
+    extras: [{ label: "Boba", price: 15 }],
+  },
+];
+
+// สุ่ม order พร้อม option & extra
+function generateRandomOrder(tableId: string): Bill {
+  const numItems = Math.floor(Math.random() * 3) + 2;
+  const items: OrderItem[] = [];
+
+  for (let i = 0; i < numItems; i++) {
+    const menuItem = menu[Math.floor(Math.random() * menu.length)];
+    const quantity = Math.floor(Math.random() * 3) + 1;
+
+    // เลือก option แบบสุ่ม
+    const selectedOptions: { [key: string]: string } = {};
+    if (menuItem.options) {
+      for (const key in menuItem.options) {
+        const choices = menuItem.options[key];
+        selectedOptions[key] =
+          choices[Math.floor(Math.random() * choices.length)];
+      }
+    }
+
+    // เลือก extras แบบสุ่ม
+    let selectedExtras: { label: string; price: number }[] = [];
+    if (menuItem.extras && menuItem.extras.length > 0) {
+      selectedExtras = menuItem.extras.filter(() => Math.random() > 0.5);
+    }
+
+    items.push({ menuItem, quantity, selectedOptions, selectedExtras });
+  }
+
+  const subTotal = items.reduce((sum, item) => {
+    const extrasTotal =
+      item.selectedExtras?.reduce((s, e) => s + e.price, 0) || 0;
+    return sum + (item.menuItem.price + extrasTotal) * item.quantity;
+  }, 0);
+
+  const serviceCharge = subTotal * 0.1;
+  const vat = (subTotal + serviceCharge) * 0.07;
+  const total = subTotal + serviceCharge + vat;
+
+  const method = Math.random() > 0.5 ? "Cash" : "QR";
+
+  return { tableId, items, subTotal, serviceCharge, vat, total, method };
+}
+
+export default function PaymentPage({ tableId }: { tableId: string }) {
+  const bill = generateRandomOrder(tableId);
+  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "QR">(
+    bill.method
+  );
   const router = useRouter();
 
   const handlePayment = () => {
-    alert("Payment successful!");
+    alert(`Payment successful via ${paymentMethod}!`);
     router.push("/history");
   };
 
@@ -37,7 +134,7 @@ export default function PaymentPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-semibold">Payment / Billing</h2>
-        <p className="text-muted-foreground">Table {currentBill.tableId}</p>
+        <p className="text-muted-foreground">Table {bill.tableId}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1fr,400px]">
@@ -56,24 +153,56 @@ export default function PaymentPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentBill.items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell className="text-right">{item.qty}</TableCell>
-                    <TableCell className="text-right">
-                      {formatPrice(item.price)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatPrice(item.price * item.qty)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {bill.items.map((item, idx) => {
+                  const extrasTotal =
+                    item.selectedExtras?.reduce((sum, e) => sum + e.price, 0) ||
+                    0;
+                  const itemTotal =
+                    (item.menuItem.price + extrasTotal) * item.quantity;
+
+                  return (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        {item.menuItem.name}
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {item.selectedOptions &&
+                            Object.entries(item.selectedOptions).map(
+                              ([key, value]) => (
+                                <div key={key}>
+                                  {key}: {value}
+                                </div>
+                              )
+                            )}
+                          {item.selectedExtras?.length ? (
+                            <div>
+                              Extras:{" "}
+                              {item.selectedExtras
+                                .map((e) => e.label)
+                                .join(", ")}
+                            </div>
+                          ) : null}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        {item.quantity}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatPrice(item.menuItem.price + extrasTotal)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatPrice(itemTotal)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
                 <TableRow>
                   <TableCell colSpan={3} className="text-right font-medium">
                     Subtotal
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {formatPrice(currentBill.subTotal)}
+                    {formatPrice(bill.subTotal)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -84,7 +213,7 @@ export default function PaymentPage() {
                     Service Charge (10%)
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {formatPrice(currentBill.serviceCharge)}
+                    {formatPrice(bill.serviceCharge)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -95,7 +224,7 @@ export default function PaymentPage() {
                     VAT (7%)
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {formatPrice(currentBill.vat)}
+                    {formatPrice(bill.vat)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -106,7 +235,7 @@ export default function PaymentPage() {
                     Total
                   </TableCell>
                   <TableCell className="text-right font-semibold text-lg">
-                    {formatPrice(currentBill.total)}
+                    {formatPrice(bill.total)}
                   </TableCell>
                 </TableRow>
               </TableBody>
@@ -122,7 +251,7 @@ export default function PaymentPage() {
             <RadioGroup
               defaultValue={paymentMethod}
               onValueChange={(value) =>
-                setPaymentMethod(value as Bill["method"])
+                setPaymentMethod(value as "Cash" | "QR")
               }
             >
               <div className="flex items-center space-x-2 border rounded-lg p-4">

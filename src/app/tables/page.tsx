@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import { useRouter } from "next/navigation";
+import { calculateItemTotal } from "@/lib/utils";
 
 const statusConfig = {
   Available: {
@@ -28,17 +30,16 @@ const statusConfig = {
   },
 };
 
-import { Users } from "lucide-react";
-
 export default function TablesPage() {
+  const router = useRouter();
   const [activeZone, setActiveZone] = useState("Indoor");
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [showCurrentOrder, setShowCurrentOrder] = useState(false); // ⬅️ State ใหม่
 
   const zones = Array.from(new Set(tables.map((t) => t.zone))).sort();
   const tablesInZone = tables.filter((t) => t.zone === activeZone);
   const selectedTableData = tablesInZone.find((t) => t.id === selectedTable);
 
-  // Calculate zone statistics
   const zoneStats = zones.map((zone) => {
     const zoneTables = tables.filter((t) => t.zone === zone);
     return {
@@ -51,8 +52,19 @@ export default function TablesPage() {
     };
   });
 
+  const handleViewOrder = () => {
+    if (selectedTableData?.currentOrder) {
+      sessionStorage.setItem(
+        "currentCart",
+        JSON.stringify(selectedTableData.currentOrder)
+      );
+      setShowCurrentOrder(true); // ⬅️ แสดง Current Order
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Zone Tabs */}
       <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start">
         <div>
           <h2 className="text-2xl font-semibold">Tables</h2>
@@ -62,7 +74,7 @@ export default function TablesPage() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:flex md:items-center">
-          {zoneStats.map(({ zone, total, available, occupied }) => (
+          {zoneStats.map(({ zone, available, occupied }) => (
             <Button
               key={zone}
               variant={zone === activeZone ? "default" : "outline"}
@@ -94,19 +106,25 @@ export default function TablesPage() {
         </div>
       </div>
 
+      {/* Table Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
         {tablesInZone.map((table) => (
           <TableCard
             key={table.id}
             table={table}
-            onClick={() => setSelectedTable(table.id)}
+            onClick={() => {
+              setSelectedTable(table.id);
+              setShowCurrentOrder(false); // ⬅️ Reset เมื่อเลือกโต๊ะใหม่
+            }}
             selected={selectedTable === table.id}
           />
         ))}
       </div>
 
+      {/* Selected Table Details */}
       {selectedTableData && (
         <div className="grid gap-6 md:grid-cols-2">
+          {/* Table Info */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -135,6 +153,7 @@ export default function TablesPage() {
                     {selectedTableData.capacity} seats
                   </p>
                 </div>
+
                 {selectedTableData.currentOrder && (
                   <>
                     <div className="flex justify-between items-center">
@@ -152,9 +171,7 @@ export default function TablesPage() {
                       <p className="font-medium">
                         {formatDistanceToNow(
                           new Date(selectedTableData.currentOrder.createdAt),
-                          {
-                            addSuffix: true,
-                          }
+                          { addSuffix: true }
                         )}
                       </p>
                     </div>
@@ -170,9 +187,13 @@ export default function TablesPage() {
                 >
                   Close
                 </Button>
+
                 {selectedTableData.status === "Occupied" && (
-                  <Button className="flex-1">View Order</Button>
+                  <Button className="flex-1" onClick={handleViewOrder}>
+                    View Order
+                  </Button>
                 )}
+
                 {selectedTableData.status === "Available" && (
                   <Button className="flex-1">New Order</Button>
                 )}
@@ -180,49 +201,104 @@ export default function TablesPage() {
             </CardContent>
           </Card>
 
-          {selectedTableData.status === "Occupied" &&
-            selectedTableData.currentOrder && (
-              <Card>
-                <CardHeader>
-                  <h3 className="text-lg font-medium">Current Order</h3>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {selectedTableData.currentOrder.items.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between items-center"
-                      >
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            x{item.quantity}
-                          </p>
-                        </div>
-                        <p className="font-medium">
-                          {formatPrice(item.price * item.quantity)}
+          {/* Current Order Details */}
+          {showCurrentOrder && selectedTableData.currentOrder && (
+            <Card>
+              <CardHeader>
+                <h3 className="text-lg font-medium">Current Order</h3>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {selectedTableData.currentOrder.items.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          x{item.quantity}
                         </p>
+                        {(item.selectedOptions || item.menuItem.options) && (
+                          <div className="text-xs text-muted-foreground">
+                            Options:{" "}
+                            {Object.entries(item.selectedOptions ?? {}).map(
+                              ([k, v]) => (
+                                <p
+                                  key={k}
+                                  className="text-sm text-muted-foreground"
+                                >
+                                  {k}: {v}
+                                </p>
+                              )
+                            )}
+                          </div>
+                        )}
+
+                        {(item.selectedExtras ?? item.menuItem.extras ?? [])
+                          ?.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            Extras:{" "}
+                            {(item.selectedExtras || item.menuItem.extras)?.map(
+                              (extra, i) => (
+                                <p key={i}>
+                                  {extra.label}: {formatPrice(extra.price)}
+                                </p>
+                              )
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                    <div className="pt-4 mt-4 border-t flex justify-between items-center">
-                      <p className="font-semibold">Total</p>
-                      <p className="font-semibold">
-                        {formatPrice(selectedTableData.currentOrder.total)}
+                      <p className="font-medium">
+                        {formatPrice(calculateItemTotal(item))}
                       </p>
                     </div>
-                  </div>
+                  ))}
 
-                  <div className="flex gap-2 mt-6">
-                    <Button variant="outline" className="flex-1">
-                      Add Items
-                    </Button>
-                    <Button variant="default" className="flex-1">
-                      Bill Out
-                    </Button>
+                  <div className="pt-4 mt-4 border-t flex justify-between items-center">
+                    <p className="font-semibold">Total</p>
+                    <p className="font-semibold">
+                      {formatPrice(selectedTableData.currentOrder.total)}
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+
+                <div className="flex gap-2 mt-6">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      if (selectedTableData) {
+                        // เก็บ current order หรือ table info ไว้ถ้าต้องใช้บนหน้า menu
+                        sessionStorage.setItem(
+                          "currentCart",
+                          JSON.stringify(selectedTableData.currentOrder ?? {})
+                        );
+                        router.push("/menu"); // ไปหน้า menu
+                      }
+                    }}
+                  >
+                    Add Items
+                  </Button>
+                  <Button
+                    variant="default"
+                    className="flex-1"
+                    onClick={() => {
+                      if (selectedTableData) {
+                        // เก็บ current order ไว้ถ้าต้องใช้บนหน้า payment
+                        sessionStorage.setItem(
+                          "currentCart",
+                          JSON.stringify(selectedTableData.currentOrder ?? {})
+                        );
+                        router.push("/payment"); // ไปหน้า payment
+                      }
+                    }}
+                  >
+                    Bill Out
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>

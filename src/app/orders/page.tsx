@@ -1,11 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { OrderStatus } from "@/components/OrderStatus";
+import { OrderDetailDialog } from "@/components/OrderDetailDialog";
 import type { Order } from "@/lib/data";
-import { orders } from "@/lib/data";
+import { orders as initialOrders } from "@/lib/data";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function OrdersPage() {
+  const [orders, setOrders] = useState(initialOrders);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
   const ordersByStatus: Record<
     "All" | "Preparing" | "Done" | "Cancelled",
     Order[]
@@ -14,6 +19,15 @@ export default function OrdersPage() {
     Preparing: orders.filter((order) => order.status === "Preparing"),
     Done: orders.filter((order) => order.status === "Done"),
     Cancelled: orders.filter((order) => order.status === "Cancelled"),
+  };
+
+  const updateOrderStatus = (orderId: string, newStatus: Order["status"]) => {
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId ? { ...order, status: newStatus } : order
+      )
+    );
+    setSelectedOrder(null);
   };
 
   return (
@@ -41,13 +55,24 @@ export default function OrdersPage() {
                 <p className="text-muted-foreground">No orders found.</p>
               ) : (
                 statusOrders.map((order) => (
-                  <OrderStatus key={order.id} order={order} />
+                  <div key={order.id} onClick={() => setSelectedOrder(order)}>
+                    <OrderStatus order={order} />
+                  </div>
                 ))
               )}
             </div>
           </TabsContent>
         ))}
       </Tabs>
+
+      {selectedOrder && (
+        <OrderDetailDialog
+          order={selectedOrder}
+          open={!!selectedOrder}
+          onOpenChange={setSelectedOrder}
+          onUpdateStatus={updateOrderStatus}
+        />
+      )}
     </div>
   );
 }

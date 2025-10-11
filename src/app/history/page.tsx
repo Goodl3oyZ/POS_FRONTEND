@@ -4,10 +4,22 @@ import { useState } from "react";
 import { Bill, bills } from "@/lib/data";
 import { formatPrice } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Eye, Receipt } from "lucide-react";
 
@@ -87,7 +99,7 @@ export default function HistoryPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {selectedBill && (
+          {selectedBill ? (
             <div className="space-y-6">
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Table {selectedBill.tableId}</span>
@@ -104,14 +116,65 @@ export default function HistoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selectedBill.items.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell className="text-right">{item.qty}</TableCell>
-                      <TableCell className="text-right">{formatPrice(item.price)}</TableCell>
-                      <TableCell className="text-right">{formatPrice(item.price * item.qty)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {selectedBill.items.map((item, index) => {
+                    // รวมราคาของ extras
+                    const extrasTotal =
+                      item.selectedExtras?.reduce(
+                        (sum, e) => sum + e.price,
+                        0
+                      ) || 0;
+
+                    // รวมราคาของ options (ถ้ามีราคา)
+                    const optionsTotal = Object.values(
+                      item.selectedOptions || {}
+                    ).reduce(
+                      (sum, value) =>
+                        sum + (typeof value === "number" ? value : 0),
+                      0
+                    );
+
+                    const unitPrice =
+                      item.menuItem.price + extrasTotal + optionsTotal;
+                    const itemTotal = unitPrice * item.quantity;
+
+                    return (
+                      <TableRow key={index}>
+                        <TableCell>
+                          {item.menuItem.name}
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {item.selectedOptions &&
+                              Object.entries(item.selectedOptions).map(
+                                ([key, value]) => (
+                                  <div key={key}>
+                                    {key}: {value}
+                                  </div>
+                                )
+                              )}
+                            {item.selectedExtras?.length ? (
+                              <div>
+                                Extras:{" "}
+                                {item.selectedExtras
+                                  .map((e) => e.label)
+                                  .join(", ")}
+                              </div>
+                            ) : null}
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          {item.quantity}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatPrice(unitPrice)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatPrice(itemTotal)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+
+                  {/* Subtotal / Service / VAT / Total */}
                   <TableRow>
                     <TableCell colSpan={3} className="text-right font-medium">
                       Subtotal
@@ -121,7 +184,10 @@ export default function HistoryPage() {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell colSpan={3} className="text-right text-muted-foreground">
+                    <TableCell
+                      colSpan={3}
+                      className="text-right text-muted-foreground"
+                    >
                       Service Charge (10%)
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
@@ -129,7 +195,10 @@ export default function HistoryPage() {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell colSpan={3} className="text-right text-muted-foreground">
+                    <TableCell
+                      colSpan={3}
+                      className="text-right text-muted-foreground"
+                    >
                       VAT (7%)
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
@@ -137,7 +206,10 @@ export default function HistoryPage() {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell colSpan={3} className="text-right font-semibold text-lg">
+                    <TableCell
+                      colSpan={3}
+                      className="text-right font-semibold text-lg"
+                    >
                       Total
                     </TableCell>
                     <TableCell className="text-right font-semibold text-lg">
@@ -152,6 +224,10 @@ export default function HistoryPage() {
                   <Receipt className="w-4 h-4 mr-2" /> Print Receipt
                 </Button>
               </div>
+            </div>
+          ) : (
+            <div className="text-center p-10 text-gray-500 italic">
+              No bill selected.
             </div>
           )}
         </DialogContent>

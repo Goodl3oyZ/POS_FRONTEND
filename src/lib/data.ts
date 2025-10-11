@@ -21,9 +21,10 @@ export interface ExtraItem {
 }
 
 export interface OrderItem {
-  name: string;
+  menuItem: MenuItem;
   quantity: number;
-  price: number;
+  selectedOptions?: Record<string, string>;
+  selectedExtras?: ExtraItem[];
 }
 
 export interface Order {
@@ -43,12 +44,6 @@ export interface Table {
   currentOrder?: Order;
 }
 
-export interface BillItem {
-  name: string;
-  qty: number;
-  price: number;
-}
-
 export interface Bill {
   id: string;
   time: string;
@@ -57,8 +52,15 @@ export interface Bill {
   serviceCharge: number;
   vat: number;
   subTotal: number;
-  items: BillItem[];
+  items: BillMenuItem[]; // แทน menu[] ด้วย type ที่มี quantity + extras
   tableId: string;
+}
+
+export interface BillMenuItem {
+  menuItem: MenuItem;
+  quantity: number;
+  selectedOptions?: Record<string, string>;
+  selectedExtras?: ExtraItem[];
 }
 
 // ------------------ MENU ITEMS ------------------
@@ -195,6 +197,48 @@ export const menuItems: MenuItem[] = [
   },
 ];
 
+export const orders: Order[] = [
+  {
+    id: "ORD001",
+    tableId: "T02",
+    items: [
+      {
+        menuItem: menuItems.find((m) => m.name === "Pad Thai")!,
+        quantity: 2,
+        selectedOptions: { Protein: "Shrimp", Spiciness: "Medium" },
+        selectedExtras: [{ label: "Cheese", price: 10 }],
+      },
+      {
+        menuItem: menuItems.find((m) => m.name === "Green Curry")!,
+        quantity: 1,
+        selectedOptions: { Protein: "Chicken", Spiciness: "Mild" },
+      },
+    ],
+    status: "Preparing",
+    total: 390,
+    createdAt: "2025-09-29T10:30:00",
+  },
+  {
+    id: "ORD002",
+    tableId: "G02",
+    items: [
+      {
+        menuItem: menuItems.find((m) => m.name === "Tom Yum Goong")!,
+        quantity: 1,
+        selectedOptions: { Spiciness: "Extra Hot" },
+        selectedExtras: [{ label: "Lime", price: 5 }],
+      },
+      {
+        menuItem: menuItems.find((m) => m.name === "Som Tam")!,
+        quantity: 2,
+      },
+    ],
+    status: "Done",
+    total: 360,
+    createdAt: "2025-09-29T11:15:00",
+  },
+];
+
 // ------------------ TABLES ------------------
 export const tables: Table[] = [
   {
@@ -208,17 +252,7 @@ export const tables: Table[] = [
     zone: "Indoor",
     status: "Occupied",
     capacity: 2,
-    currentOrder: {
-      id: "ORD001",
-      tableId: "T02",
-      items: [
-        { name: "Pad Thai", quantity: 2, price: 120 },
-        { name: "Green Curry", quantity: 1, price: 150 },
-      ],
-      status: "Preparing",
-      total: 390,
-      createdAt: "2025-09-29T10:30:00",
-    },
+    currentOrder: orders.find((o) => o.id === "ORD001"),
   },
   {
     id: "T03",
@@ -269,17 +303,7 @@ export const tables: Table[] = [
     zone: "Garden",
     status: "Occupied",
     capacity: 4,
-    currentOrder: {
-      id: "ORD002",
-      tableId: "G02",
-      items: [
-        { name: "Tom Yum Goong", quantity: 1, price: 180 },
-        { name: "Som Tam", quantity: 2, price: 90 },
-      ],
-      status: "Done",
-      total: 360,
-      createdAt: "2025-09-29T11:15:00",
-    },
+    currentOrder: orders.find((o) => o.id === "ORD002"),
   },
   {
     id: "G03",
@@ -300,17 +324,7 @@ export const tables: Table[] = [
     zone: "VIP",
     status: "Occupied",
     capacity: 8,
-    currentOrder: {
-      id: "ORD003",
-      tableId: "V01",
-      items: [
-        { name: "Green Curry", quantity: 2, price: 150 },
-        { name: "Mango Sticky Rice", quantity: 2, price: 100 },
-      ],
-      status: "Preparing",
-      total: 500,
-      createdAt: "2025-09-29T12:00:00",
-    },
+    currentOrder: orders.find((o) => o.id === "ORD003"), // ถ้ามี Order ที่ 3
   },
   {
     id: "V02",
@@ -358,88 +372,96 @@ export const tables: Table[] = [
   },
 ];
 
-// ------------------ ORDERS ------------------
-export const orders: Order[] = [
-  {
-    id: "ORD001",
-    tableId: "T02",
-    items: [
-      { name: "Pad Thai", quantity: 2, price: 120 },
-      { name: "Green Curry", quantity: 1, price: 150 },
-    ],
-    status: "Preparing",
-    total: 390,
-    createdAt: "2025-09-29T10:30:00",
-  },
-  {
-    id: "ORD002",
-    tableId: "G02",
-    items: [
-      { name: "Tom Yum Goong", quantity: 1, price: 180 },
-      { name: "Som Tam", quantity: 2, price: 90 },
-    ],
-    status: "Done",
-    total: 360,
-    createdAt: "2025-09-29T11:15:00",
-  },
-  {
-    id: "ORD003",
-    tableId: "V01",
-    items: [
-      { name: "Green Curry", quantity: 2, price: 150 },
-      { name: "Mango Sticky Rice", quantity: 2, price: 100 },
-    ],
-    status: "Preparing",
-    total: 500,
-    createdAt: "2025-09-29T12:00:00",
-  },
-];
+// ฟังก์ชันช่วยหา menuItem จากชื่อ
+const findMenuItem = (name: string) => menuItems.find((m) => m.name === name)!;
 
-// ------------------ BILLS ------------------
+// ตัวอย่าง selectedOptions / extras
+const sampleOptions = {
+  "Pad Thai": { Protein: "Shrimp", Spiciness: "Medium" },
+  "Green Curry": { Protein: "Chicken", Spiciness: "Hot" },
+  "Tom Yum Goong": { Spiciness: "Extra Hot", "Add-ons": "Extra Shrimp" },
+};
+
+const sampleExtras = {
+  "Pad Thai": [{ label: "Cheese", price: 10 }],
+  "Green Curry": [{ label: "Extra Coconut Milk", price: 20 }],
+  "Tom Yum Goong": [{ label: "Lime", price: 5 }],
+};
+
 export const bills: Bill[] = [
   {
     id: "B001",
     time: "2025-09-25T12:30:00",
-    total: 749,
+    tableId: "T02",
+    method: "Cash",
+    items: [
+      {
+        menuItem: findMenuItem("Pad Thai"),
+        quantity: 2,
+        selectedOptions: sampleOptions["Pad Thai"],
+        selectedExtras: sampleExtras["Pad Thai"],
+      },
+      {
+        menuItem: findMenuItem("Green Curry"),
+        quantity: 2,
+        selectedOptions: sampleOptions["Green Curry"],
+        selectedExtras: sampleExtras["Green Curry"],
+      },
+      {
+        menuItem: findMenuItem("Thai Ice Tea"),
+        quantity: 2,
+      },
+    ],
     subTotal: 640,
     serviceCharge: 64,
     vat: 45,
-    method: "Cash",
-    tableId: "T02",
-    items: [
-      { name: "Pad Thai", qty: 2, price: 120 },
-      { name: "Green Curry", qty: 2, price: 150 },
-      { name: "Thai Ice Tea", qty: 2, price: 50 },
-    ],
+    total: 749,
   },
   {
     id: "B002",
     time: "2025-09-26T18:10:00",
-    total: 374.5,
+    tableId: "T03",
+    method: "QR",
+    items: [
+      {
+        menuItem: findMenuItem("Mango Sticky Rice"),
+        quantity: 2,
+      },
+      {
+        menuItem: findMenuItem("Thai Coffee"),
+        quantity: 2,
+      },
+    ],
     subTotal: 320,
     serviceCharge: 32,
     vat: 22.5,
-    method: "QR",
-    tableId: "T03",
-    items: [
-      { name: "Mango Sticky Rice", qty: 2, price: 100 },
-      { name: "Thai Coffee", qty: 2, price: 60 },
-    ],
+    total: 374.5,
   },
   {
     id: "B003",
     time: "2025-09-27T19:45:00",
-    total: 995.11,
+    tableId: "T06",
+    method: "Cash",
+    items: [
+      {
+        menuItem: findMenuItem("Tom Yum Goong"),
+        quantity: 2,
+        selectedOptions: sampleOptions["Tom Yum Goong"],
+        selectedExtras: sampleExtras["Tom Yum Goong"],
+      },
+      {
+        menuItem: findMenuItem("Som Tam"),
+        quantity: 2,
+      },
+      {
+        menuItem: findMenuItem("Grilled Fish"),
+        quantity: 1,
+      },
+    ],
     subTotal: 850,
     serviceCharge: 85,
     vat: 60.11,
-    method: "Cash",
-    tableId: "T06",
-    items: [
-      { name: "Tom Yum Goong", qty: 2, price: 180 },
-      { name: "Som Tam", qty: 2, price: 90 },
-      { name: "Grilled Fish", qty: 1, price: 310 },
-    ],
+    total: 995.11,
   },
 ];
 
@@ -447,16 +469,32 @@ export const bills: Bill[] = [
 export const currentBill: Bill = {
   id: "B004",
   time: new Date().toISOString(),
+  tableId: "T04",
+  method: "Cash",
+  items: [
+    {
+      menuItem: findMenuItem("Pad Thai"),
+      quantity: 2,
+      selectedOptions: sampleOptions["Pad Thai"],
+      selectedExtras: sampleExtras["Pad Thai"],
+    },
+    {
+      menuItem: findMenuItem("Tom Yum Goong"),
+      quantity: 1,
+      selectedOptions: sampleOptions["Tom Yum Goong"],
+      selectedExtras: sampleExtras["Tom Yum Goong"],
+    },
+    {
+      menuItem: findMenuItem("Som Tam"),
+      quantity: 2,
+    },
+    {
+      menuItem: findMenuItem("Thai Ice Tea"),
+      quantity: 4,
+    },
+  ],
   subTotal: 740,
   serviceCharge: 74,
   vat: 51.8,
   total: 865.8,
-  method: "Cash",
-  tableId: "T04",
-  items: [
-    { name: "Pad Thai", qty: 2, price: 120 },
-    { name: "Tom Yum Goong", qty: 1, price: 180 },
-    { name: "Som Tam", qty: 2, price: 90 },
-    { name: "Thai Ice Tea", qty: 4, price: 50 },
-  ],
 };

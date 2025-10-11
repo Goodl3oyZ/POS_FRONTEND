@@ -2,15 +2,18 @@
 
 import { Badge } from "./ui/badge";
 import { Card, CardContent } from "./ui/card";
-import { Circle, UtensilsCrossed, Receipt, CheckCircle2 } from "lucide-react";
+import {
+  Circle,
+  UtensilsCrossed,
+  Receipt,
+  CheckCircle2,
+  Users,
+} from "lucide-react";
+import { formatPrice } from "@/lib/utils";
+import { Table } from "@/lib/data"; // import interface Table
 
 interface TableCardProps {
-  table: {
-    id: string;
-    zone: string;
-    status: "Available" | "Occupied" | "Billing" | "Paid";
-    capacity: number;
-  };
+  table: Table; // ใช้ interface Table ที่มี currentOrder
   onClick?: () => void;
   selected?: boolean;
 }
@@ -20,33 +23,31 @@ export const statusConfig = {
     bgColor: "bg-gray-100",
     textColor: "text-gray-700",
     borderColor: "border-gray-300",
-    icon: Circle, // วงกลมเปล่า
+    icon: Circle,
     label: "Available",
   },
   Occupied: {
     bgColor: "bg-green-100",
     textColor: "text-green-700",
     borderColor: "border-green-300",
-    icon: UtensilsCrossed, // 🍽️
+    icon: UtensilsCrossed,
     label: "Occupied",
   },
   Billing: {
     bgColor: "bg-blue-100",
     textColor: "text-blue-700",
     borderColor: "border-blue-300",
-    icon: Receipt, // ใบเสร็จ 💵
+    icon: Receipt,
     label: "Billing",
   },
   Paid: {
     bgColor: "bg-yellow-100",
     textColor: "text-yellow-700",
     borderColor: "border-yellow-300",
-    icon: CheckCircle2, // วงกลมมีติ๊ก ✅
+    icon: CheckCircle2,
     label: "Paid",
   },
 } as const;
-
-import { Users } from "lucide-react";
 
 export function TableCard({ table, onClick, selected }: TableCardProps) {
   const status = statusConfig[table.status];
@@ -63,12 +64,24 @@ export function TableCard({ table, onClick, selected }: TableCardProps) {
           <span className="text-2xl font-semibold tracking-tight">
             {table.id}
           </span>
+
           <Badge
             variant="secondary"
             className={`${status.textColor} ${status.bgColor} transition-colors flex items-center gap-1`}
           >
             {status.icon && <status.icon className="w-4 h-4" />} {status.label}
           </Badge>
+
+          {/* แสดง current order summary ถ้ามี */}
+          {table.currentOrder ? (
+            <p className="text-sm text-muted-foreground mt-1 text-center">
+              {table.currentOrder.items.reduce(
+                (sum, item) => sum + item.quantity,
+                0
+              )}{" "}
+              items • {formatPrice(table.currentOrder.total)}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2 mt-2">
@@ -76,7 +89,7 @@ export function TableCard({ table, onClick, selected }: TableCardProps) {
           <span className="text-sm font-medium">{table.capacity}</span>
         </div>
 
-        {/* Hover effect */}
+        {/* Hover overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100">
           <span className="font-medium">Select Table</span>
         </div>

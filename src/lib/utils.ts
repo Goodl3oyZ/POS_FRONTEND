@@ -1,8 +1,31 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { OrderItem, Bill, BillMenuItem, Order } from "@/lib/data";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+export function calculateItemTotal(item: OrderItem) {
+  let total = item.menuItem.price;
+
+  // รวมราคาของ selectedOptions
+  if (item.selectedOptions) {
+    for (const [optionName, choiceLabel] of Object.entries(
+      item.selectedOptions
+    )) {
+      const option = item.menuItem.options?.find((o) => o.name === optionName);
+      const choice = option?.choices.find((c) => c.label === choiceLabel);
+      if (choice) total += choice.price;
+    }
+  }
+
+  // รวมราคาของ selectedExtras
+  if (item.selectedExtras) {
+    total += item.selectedExtras.reduce((sum, extra) => sum + extra.price, 0);
+  }
+
+  return total * item.quantity;
 }
 
 export function formatPrice(price: number): string {
@@ -24,6 +47,50 @@ export function generateOrderId(): string {
     .padStart(3, "0");
   return `ORD${year}${month}${day}${random}`;
 }
+
+const SERVICE_CHARGE_RATE = 0.1;
+const VAT_RATE = 0.07;
+
+export const generateBillFromOrder = (
+  order: Order,
+  method: "Cash" | "QR"
+): Bill => {
+  const items: BillMenuItem[] = order.items.map((item) => ({
+    menuItem: item.menuItem,
+    quantity: item.quantity,
+    selectedOptions: item.selectedOptions,
+    selectedExtras: item.selectedExtras,
+  }));
+
+  let subTotal = 0;
+  items.forEach((item) => {
+    let itemPrice = item.menuItem.price;
+
+    if (item.selectedExtras) {
+      item.selectedExtras.forEach((extra) => {
+        itemPrice += extra.price;
+      });
+    }
+
+    subTotal += itemPrice * item.quantity;
+  });
+
+  const serviceCharge = parseFloat((subTotal * SERVICE_CHARGE_RATE).toFixed(2));
+  const vat = parseFloat((subTotal * VAT_RATE).toFixed(2));
+  const total = parseFloat((subTotal + serviceCharge + vat).toFixed(2));
+
+  return {
+    id: `B-${order.id}`,
+    time: new Date().toISOString(),
+    tableId: order.tableId,
+    method,
+    items,
+    subTotal,
+    serviceCharge,
+    vat,
+    total,
+  };
+};
 
 export function getTableStatusColor(status: string): {
   bg: string;
@@ -63,3 +130,24 @@ export function getTableStatusColor(status: string): {
       };
   }
 }
+
+export const getItemTotal = (item: BillMenuItem) => {
+  const optionsTotal = item.selectedOptions
+    ? Object.entries(item.selectedOptions).reduce((sum, [, value]) => {
+        // สมมติว่า value คือราคาที่เก็บใน selectedOptions (ถ้าเก็บแค่ label ต้อง map กับ menuItem.options)
+        return sum; // ถ้าคุณเก็บราคาจริงใน selectedOptions ให้รวมตรงนี้
+      }, 0)
+    : 0;
+
+  const extrasTotal =
+    item.selectedExtras?.reduce((sum, e) => sum + e.price, 0) ?? 0;
+
+  return (item.menuItem.price + optionsTotal + extrasTotal) * item.quantity;
+};
+
+export const getItemUnitPrice = (item: BillMenuItem) => {
+  const optionsTotal = 0; // เช่นเดียวกับด้านบน
+  const extrasTotal =
+    item.selectedExtras?.reduce((sum, e) => sum + e.price, 0) ?? 0;
+  return item.menuItem.price + optionsTotal + extrasTotal;
+};
