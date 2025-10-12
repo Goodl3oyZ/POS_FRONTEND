@@ -1,13 +1,12 @@
-// ------------------ TYPES ------------------
 export interface MenuItem {
   id: number;
   name: string;
-  price: number;
+  price: number; // main menu price เป็น number
   description: string;
   image: string;
   category: string;
   options?: MenuOption[];
-  extras?: ExtraItem[]; // เพิ่มตรงนี้
+  extras?: ExtraItem[];
 }
 
 export interface MenuOption {
@@ -52,7 +51,7 @@ export interface Bill {
   serviceCharge: number;
   vat: number;
   subTotal: number;
-  items: BillMenuItem[]; // แทน menu[] ด้วย type ที่มี quantity + extras
+  items: BillMenuItem[];
   tableId: string;
 }
 
