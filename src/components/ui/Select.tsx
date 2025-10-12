@@ -25,7 +25,7 @@ export function Select({
     <select
       value={selected}
       onChange={handleChange}
-      className="border w-full px-4 py-2 rounded-md"
+      className="h-11 w-full px-4 py-2 border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl transition-all duration-200 bg-white"
     >
       {placeholder && (
         <option value="" disabled hidden>

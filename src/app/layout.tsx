@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
+// import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { Inter } from "next/font/google";
@@ -24,14 +25,20 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>
             {/* Sidebar */}
+            {/* <ProtectedRoute> */}
             <Sidebar />
+            {/* </ProtectedRoute> */}
 
             {/* Main Content */}
             <div className="flex flex-col flex-1">
               {/* Topbar */}
               <Topbar />
               {/* Page Content */}
-              <main className="flex-1 overflow-y-auto p-6">{children}</main>
+              <main className="flex-1 overflow-y-auto p-6">
+                {/* <ProtectedRoute> */}
+                {children}
+                {/* </ProtectedRoute> */}
+              </main>
             </div>
           </CartProvider>
         </AuthProvider>
