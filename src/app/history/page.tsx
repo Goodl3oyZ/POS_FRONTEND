@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Bill, bills } from "@/lib/data";
-import { formatPrice } from "@/lib/utils";
+import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -13,225 +13,127 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { format } from "date-fns";
-import { Eye, Receipt } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
+import { getAllOrders, getAllPayments } from "@/lib/api";
 
 export default function HistoryPage() {
-  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      try {
+        setLoading(true);
+        const [o, p] = await Promise.all([getAllOrders(), getAllPayments()]);
+        if (!mounted) return;
+        setOrders(Array.isArray(o.data) ? o.data : []);
+        setPayments(Array.isArray(p.data) ? p.data : []);
+        setError(null);
+      } catch (e) {
+        console.error(e);
+        setError("โหลดประวัติไม่สำเร็จ");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const closedOrders = useMemo(
+    () => orders.filter((o) => String(o.status).toLowerCase() === "closed"),
+    [orders]
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Billing History</h2>
+        <h2 className="text-2xl font-semibold">History</h2>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bill ID</TableHead>
-                <TableHead>Table</TableHead>
-                <TableHead>Date/Time</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bills.map((bill) => (
-                <TableRow key={bill.id}>
-                  <TableCell className="font-medium">{bill.id}</TableCell>
-                  <TableCell>{bill.tableId}</TableCell>
-                  <TableCell>{format(new Date(bill.time), "PPp")}</TableCell>
-                  <TableCell>{formatPrice(bill.total)}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className={
-                        bill.method === "Cash"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-blue-100 text-blue-800"
-                      }
-                    >
-                      {bill.method}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedBill(bill)}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {error ? <div className="text-red-600">{error}</div> : null}
 
-      <Dialog open={!!selectedBill} onOpenChange={() => setSelectedBill(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex justify-between items-center">
-              <span>Bill Details - {selectedBill?.id}</span>
-              <Badge
-                variant="secondary"
-                className={
-                  selectedBill?.method === "Cash"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-blue-100 text-blue-800"
-                }
-              >
-                {selectedBill?.method}
-              </Badge>
-            </DialogTitle>
-          </DialogHeader>
+      <Tabs defaultValue="orders">
+        <TabsList>
+          <TabsTrigger value="orders">ประวัติออเดอร์</TabsTrigger>
+          <TabsTrigger value="payments">ประวัติการชำระเงิน</TabsTrigger>
+        </TabsList>
 
-          {selectedBill ? (
-            <div className="space-y-6">
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Table {selectedBill.tableId}</span>
-                <span>{format(new Date(selectedBill.time), "PPp")}</span>
-              </div>
-
+        <TabsContent value="orders">
+          <Card>
+            <CardHeader>
+              <CardTitle>Closed Orders</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Table</TableHead>
+                    <TableHead>Date/Time</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selectedBill.items.map((item, index) => {
-                    // รวมราคาของ extras
-                    const extrasTotal =
-                      item.selectedExtras?.reduce(
-                        (sum, e) => sum + e.price,
-                        0
-                      ) || 0;
-
-                    // รวมราคาของ options (ถ้ามีราคา)
-                    const optionsTotal = Object.values(
-                      item.selectedOptions || {}
-                    ).reduce(
-                      (sum, value) =>
-                        sum + (typeof value === "number" ? value : 0),
-                      0
-                    );
-
-                    const unitPrice =
-                      item.menuItem.price + extrasTotal + optionsTotal;
-                    const itemTotal = unitPrice * item.quantity;
-
-                    return (
-                      <TableRow key={index}>
-                        <TableCell>
-                          {item.menuItem.name}
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            {item.selectedOptions &&
-                              Object.entries(item.selectedOptions).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    {key}: {value}
-                                  </div>
-                                )
-                              )}
-                            {item.selectedExtras?.length ? (
-                              <div>
-                                Extras:{" "}
-                                {item.selectedExtras
-                                  .map((e) => e.label)
-                                  .join(", ")}
-                              </div>
-                            ) : null}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          {item.quantity}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatPrice(unitPrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatPrice(itemTotal)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-
-                  {/* Subtotal / Service / VAT / Total */}
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-right font-medium">
-                      Subtotal
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatPrice(selectedBill.subTotal)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="text-right text-muted-foreground"
-                    >
-                      Service Charge (10%)
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {formatPrice(selectedBill.serviceCharge)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="text-right text-muted-foreground"
-                    >
-                      VAT (7%)
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {formatPrice(selectedBill.vat)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="text-right font-semibold text-lg"
-                    >
-                      Total
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-lg">
-                      {formatPrice(selectedBill.total)}
-                    </TableCell>
-                  </TableRow>
+                  {(loading ? [] : closedOrders).map((o) => (
+                    <TableRow key={o.id}>
+                      <TableCell className="font-medium">#{o.id}</TableCell>
+                      <TableCell>{o.table_id || o.tableId}</TableCell>
+                      <TableCell>
+                        {o.closed_at
+                          ? format(new Date(o.closed_at), "PPp")
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatPrice(Number(o.total_baht ?? 0))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm">
-                  <Receipt className="w-4 h-4 mr-2" /> Print Receipt
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center p-10 text-gray-500 italic">
-              No bill selected.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+        <TabsContent value="payments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payments</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(loading ? [] : payments).map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.id}</TableCell>
+                      <TableCell>#{p.order_id || p.orderId}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{p.method}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatPrice(Number(p.amount ?? 0))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

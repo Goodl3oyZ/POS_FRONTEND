@@ -1,6 +1,7 @@
 import { api } from "./config";
 
 // Types
+// Legacy (camelCase) types used in some parts of the app
 export interface OrderItem {
   menuItemId: string;
   quantity: number;
@@ -10,6 +11,18 @@ export interface OrderItem {
 export interface CreateOrderRequest {
   tableId: string;
   items: OrderItem[];
+}
+
+// Snake_case types expected by backend
+export interface SnakeOrderItem {
+  menu_item_id: string | number;
+  quantity: number;
+  modifiers?: string[];
+}
+
+export interface SnakeCreateOrderRequest {
+  table_id: string | number;
+  items: SnakeOrderItem[];
 }
 
 export interface AddItemToOrderRequest {
@@ -52,7 +65,15 @@ export async function getOrderById(id: string) {
  * @param orderData - Order information to create
  * @returns Promise containing created order data
  */
-export async function createOrder(orderData: CreateOrderRequest) {
+export async function createOrder(
+  orderData: CreateOrderRequest | SnakeCreateOrderRequest | any
+) {
+  // Pass through payload as-is; backend expects snake_case
+  if (process.env.NODE_ENV !== "production") {
+    // Lightweight debug to help diagnose 400s
+    // eslint-disable-next-line no-console
+    console.log("POST /v1/orders payload:", orderData);
+  }
   return api.post("/v1/orders", orderData);
 }
 

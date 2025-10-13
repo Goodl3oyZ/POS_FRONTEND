@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TableCard } from "@/components/TableCard";
-import { tables } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { formatPrice } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
-import { calculateItemTotal } from "@/lib/utils";
+import { getAllTables } from "@/lib/api";
+import { getTableOrders } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 const statusConfig = {
   Available: {
@@ -28,37 +28,79 @@ const statusConfig = {
     variant: "secondary" as const,
     className: "bg-yellow-100 text-yellow-800",
   },
-};
+} as const;
 
 export default function TablesPage() {
   const router = useRouter();
-  const [activeZone, setActiveZone] = useState("Indoor");
+  const [tables, setTables] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeZone, setActiveZone] = useState<string>("");
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [showCurrentOrder, setShowCurrentOrder] = useState(false); // ⬅️ State ใหม่
+  const [tableOrders, setTableOrders] = useState<any[] | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const zones = Array.from(new Set(tables.map((t) => t.zone))).sort();
-  const tablesInZone = tables.filter((t) => t.zone === activeZone);
-  const selectedTableData = tablesInZone.find((t) => t.id === selectedTable);
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      try {
+        setLoading(true);
+        const res = await getAllTables();
+        if (!mounted) return;
+        const data = Array.isArray(res.data) ? res.data : [];
+        setTables(data);
+        const zones = Array.from(new Set(data.map((t: any) => t.zone || "")));
+        setActiveZone(zones[0] || "");
+        setError(null);
+      } catch (e) {
+        console.error(e);
+        setError("โหลดข้อมูลโต๊ะไม่สำเร็จ");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const zones = useMemo(
+    () => Array.from(new Set(tables.map((t: any) => t.zone || ""))).sort(),
+    [tables]
+  );
+  const tablesInZone = useMemo(
+    () => tables.filter((t: any) => (t.zone || "") === activeZone),
+    [tables, activeZone]
+  );
+  const selectedTableData = useMemo(
+    () => tablesInZone.find((t: any) => String(t.id) === String(selectedTable)),
+    [tablesInZone, selectedTable]
+  );
 
   const zoneStats = zones.map((zone) => {
-    const zoneTables = tables.filter((t) => t.zone === zone);
+    const zoneTables = tables.filter((t: any) => (t.zone || "") === zone);
     return {
       zone,
       total: zoneTables.length,
-      available: zoneTables.filter((t) => t.status === "Available").length,
-      occupied: zoneTables.filter((t) => t.status === "Occupied").length,
-      billing: zoneTables.filter((t) => ["Billing", "Paid"].includes(t.status))
-        .length,
+      available: zoneTables.filter((t: any) => t.status === "Available").length,
+      occupied: zoneTables.filter((t: any) => t.status === "Occupied").length,
+      billing: zoneTables.filter((t: any) =>
+        ["Billing", "Paid"].includes(t.status)
+      ).length,
     };
   });
 
-  const handleViewOrder = () => {
-    if (selectedTableData?.currentOrder) {
-      sessionStorage.setItem(
-        "currentCart",
-        JSON.stringify(selectedTableData.currentOrder)
-      );
-      setShowCurrentOrder(true); // ⬅️ แสดง Current Order
+  const loadTableOrders = async (tableId: string) => {
+    try {
+      setLoadingOrders(true);
+      const res = await getTableOrders(tableId);
+      setTableOrders(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error(e);
+      setTableOrders([]);
+    } finally {
+      setLoadingOrders(false);
     }
   };
 
@@ -82,7 +124,7 @@ export default function TablesPage() {
               className="flex-1 h-auto py-2"
             >
               <div className="flex flex-col items-center gap-1">
-                <span className="font-medium">{zone}</span>
+                <span className="font-medium">{zone || "Unknown"}</span>
                 <div className="flex items-center gap-2 text-xs">
                   <span
                     className={
@@ -107,19 +149,29 @@ export default function TablesPage() {
       </div>
 
       {/* Table Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
-        {tablesInZone.map((table) => (
-          <TableCard
-            key={table.id}
-            table={table}
-            onClick={() => {
-              setSelectedTable(table.id);
-              setShowCurrentOrder(false); // ⬅️ Reset เมื่อเลือกโต๊ะใหม่
-            }}
-            selected={selectedTable === table.id}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex items-center text-muted-foreground gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading tables...
+        </div>
+      ) : error ? (
+        <div className="text-red-600">{error}</div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
+          {tablesInZone.map((table: any) => (
+            <TableCard
+              key={table.id}
+              table={table}
+              onClick={() => {
+                const id = String(table.id);
+                setSelectedTable(id);
+                setTableOrders(null);
+                loadTableOrders(id);
+              }}
+              selected={selectedTable === table.id}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Selected Table Details */}
       {selectedTableData && (
@@ -130,8 +182,16 @@ export default function TablesPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Table Details</h3>
                 <Badge
-                  variant={statusConfig[selectedTableData.status].variant}
-                  className={statusConfig[selectedTableData.status].className}
+                  variant={
+                    statusConfig[
+                      selectedTableData.status as keyof typeof statusConfig
+                    ]?.variant
+                  }
+                  className={
+                    statusConfig[
+                      selectedTableData.status as keyof typeof statusConfig
+                    ]?.className
+                  }
                 >
                   {selectedTableData.status}
                 </Badge>
@@ -153,30 +213,17 @@ export default function TablesPage() {
                     {selectedTableData.capacity} seats
                   </p>
                 </div>
-
-                {selectedTableData.currentOrder && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm text-muted-foreground">
-                        Current Order
-                      </p>
-                      <p className="font-medium">
-                        {formatPrice(selectedTableData.currentOrder.total)}
-                      </p>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm text-muted-foreground">
-                        Order Time
-                      </p>
-                      <p className="font-medium">
-                        {formatDistanceToNow(
-                          new Date(selectedTableData.currentOrder.createdAt),
-                          { addSuffix: true }
-                        )}
-                      </p>
-                    </div>
-                  </>
-                )}
+                {selectedTableData.updatedAt ? (
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-muted-foreground">Updated</p>
+                    <p className="font-medium">
+                      {formatDistanceToNow(
+                        new Date(selectedTableData.updatedAt),
+                        { addSuffix: true }
+                      )}
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex gap-2 mt-6">
@@ -189,113 +236,72 @@ export default function TablesPage() {
                 </Button>
 
                 {selectedTableData.status === "Occupied" && (
-                  <Button className="flex-1" onClick={handleViewOrder}>
-                    View Order
+                  <Button
+                    className="flex-1"
+                    onClick={() =>
+                      router.push(`/tables/${selectedTableData.id}`)
+                    }
+                  >
+                    View Orders
                   </Button>
                 )}
 
                 {selectedTableData.status === "Available" && (
-                  <Button className="flex-1">New Order</Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() =>
+                      router.push(`/menu?tableId=${selectedTableData.id}`)
+                    }
+                  >
+                    New Order
+                  </Button>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Current Order Details */}
-          {showCurrentOrder && selectedTableData.currentOrder && (
+          {/* Orders for selected table */}
+          {selectedTable && (
             <Card>
               <CardHeader>
-                <h3 className="text-lg font-medium">Current Order</h3>
+                <h3 className="text-lg font-medium">Table Orders</h3>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {selectedTableData.currentOrder.items.map((item, index) => (
-                    <div
-                      key={index}
-                      className="flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          x{item.quantity}
-                        </p>
-                        {(item.selectedOptions || item.menuItem.options) && (
-                          <div className="text-xs text-muted-foreground">
-                            Options:{" "}
-                            {Object.entries(item.selectedOptions ?? {}).map(
-                              ([k, v]) => (
-                                <p
-                                  key={k}
-                                  className="text-sm text-muted-foreground"
-                                >
-                                  {k}: {v}
-                                </p>
-                              )
-                            )}
-                          </div>
-                        )}
-
-                        {(item.selectedExtras ?? item.menuItem.extras ?? [])
-                          ?.length > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            Extras:{" "}
-                            {(item.selectedExtras || item.menuItem.extras)?.map(
-                              (extra, i) => (
-                                <p key={i}>
-                                  {extra.label}: {formatPrice(extra.price)}
-                                </p>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <p className="font-medium">
-                        {formatPrice(calculateItemTotal(item))}
-                      </p>
-                    </div>
-                  ))}
-
-                  <div className="pt-4 mt-4 border-t flex justify-between items-center">
-                    <p className="font-semibold">Total</p>
-                    <p className="font-semibold">
-                      {formatPrice(selectedTableData.currentOrder.total)}
-                    </p>
+                {loadingOrders ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading
+                    orders...
                   </div>
-                </div>
-
-                <div className="flex gap-2 mt-6">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      if (selectedTableData) {
-                        // เก็บ current order หรือ table info ไว้ถ้าต้องใช้บนหน้า menu
-                        sessionStorage.setItem(
-                          "currentCart",
-                          JSON.stringify(selectedTableData.currentOrder ?? {})
-                        );
-                        router.push("/menu"); // ไปหน้า menu
-                      }
-                    }}
-                  >
-                    Add Items
-                  </Button>
-                  <Button
-                    variant="default"
-                    className="flex-1"
-                    onClick={() => {
-                      if (selectedTableData) {
-                        // เก็บ current order ไว้ถ้าต้องใช้บนหน้า payment
-                        sessionStorage.setItem(
-                          "currentCart",
-                          JSON.stringify(selectedTableData.currentOrder ?? {})
-                        );
-                        router.push("/payment"); // ไปหน้า payment
-                      }
-                    }}
-                  >
-                    Bill Out
-                  </Button>
-                </div>
+                ) : !tableOrders || tableOrders.length === 0 ? (
+                  <div className="text-muted-foreground">
+                    No orders for this table.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {tableOrders.map((order: any) => (
+                      <div
+                        key={order.id}
+                        className="flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-medium">Order #{order.id}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {order.status}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/orders/${order.id}`)}
+                          >
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

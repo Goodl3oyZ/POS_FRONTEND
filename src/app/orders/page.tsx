@@ -1,30 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { OrderStatus } from "@/components/OrderStatus";
 import { OrderDetailDialog } from "@/components/OrderDetailDialog";
-import type { Order } from "@/lib/data";
-import { orders as initialOrders } from "@/lib/data";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getAllOrders, getOpenOrders } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState(initialOrders);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState({ all: true, open: true });
+  const [error, setError] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
-  const ordersByStatus: Record<
-    "All" | "Preparing" | "Done" | "Cancelled",
-    Order[]
-  > = {
-    All: orders,
-    Preparing: orders.filter((order) => order.status === "Preparing"),
-    Done: orders.filter((order) => order.status === "Done"),
-    Cancelled: orders.filter((order) => order.status === "Cancelled"),
-  };
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAll = async () => {
+      try {
+        setLoading({ all: true, open: true });
+        const [allRes, openRes] = await Promise.all([
+          getAllOrders(),
+          getOpenOrders(),
+        ]);
+        if (!isMounted) return;
+        // Prefer backend-provided statuses; combine lists to ensure we have everything
+        const all = Array.isArray(allRes.data) ? allRes.data : [];
+        const open = Array.isArray(openRes.data) ? openRes.data : [];
+        // Merge by id to include status from all
+        const idToOrder = new Map<string, any>();
+        [...all, ...open].forEach((o: any) => idToOrder.set(String(o.id), o));
+        setOrders(Array.from(idToOrder.values()));
+        setError(null);
+      } catch (e) {
+        console.error(e);
+        setError("โหลดรายการออเดอร์ไม่สำเร็จ");
+      } finally {
+        if (isMounted) setLoading({ all: false, open: false });
+      }
+    };
+    fetchAll();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
-  const updateOrderStatus = (orderId: string, newStatus: Order["status"]) => {
+  const ordersByStatus = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    map["All"] = orders;
+    orders.forEach((o) => {
+      const status = o.status || "Unknown";
+      if (!map[status]) map[status] = [];
+      map[status].push(o);
+    });
+    return map;
+  }, [orders]);
+
+  const updateOrderStatus = (orderId: string, newStatus: string) => {
     setOrders((prev) =>
       prev.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
+        String(order.id) === String(orderId)
+          ? { ...order, status: newStatus }
+          : order
       )
     );
     setSelectedOrder(null);
@@ -50,17 +86,23 @@ export default function OrdersPage() {
 
         {Object.entries(ordersByStatus).map(([status, statusOrders]) => (
           <TabsContent key={status} value={status} className="mt-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {statusOrders.length === 0 ? (
-                <p className="text-muted-foreground">No orders found.</p>
-              ) : (
-                statusOrders.map((order) => (
-                  <div key={order.id} onClick={() => setSelectedOrder(order)}>
-                    <OrderStatus order={order} />
-                  </div>
-                ))
-              )}
-            </div>
+            {loading.all && status === "All" ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading orders...
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {statusOrders.length === 0 ? (
+                  <p className="text-muted-foreground">No orders found.</p>
+                ) : (
+                  statusOrders.map((order: any) => (
+                    <div key={order.id} onClick={() => setSelectedOrder(order)}>
+                      <OrderStatus order={order} />
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </TabsContent>
         ))}
       </Tabs>

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Search } from "lucide-react";
-import { menuItems, MenuItem } from "@/lib/data";
+import { useState, useEffect } from "react";
+import { Search, Loader2 } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
-import { MenuCard } from "@/components/MenuCard";
+import { getAllMenuItems } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Minus, Plus } from "lucide-react";
@@ -16,9 +15,43 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
+import { motion } from "framer-motion";
+
+// Types
+interface MenuItem {
+  id: string;
+  name: string;
+  price_baht: number;
+  active: boolean;
+  image_url?: string;
+  description?: string;
+  category?: {
+    id: string;
+    name: string;
+    display_order?: number;
+  };
+  modifiers?: Array<{
+    id: string;
+    name: string;
+    price_baht: number;
+  }>;
+}
+
+interface LoadingState {
+  isLoading: boolean;
+  error: string | null;
+}
 
 export default function MenuPage() {
   const [search, setSearch] = useState("");
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState<LoadingState>({
+    isLoading: true,
+    error: null,
+  });
   const { addItem } = useCart();
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -29,43 +62,73 @@ export default function MenuPage() {
   const [customText, setCustomText] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  const categories = Array.from(
-    new Set(menuItems.map((item) => item.category))
-  ).sort();
+  // Fetch menu items on component mount
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      try {
+        setLoading({ isLoading: true, error: null });
+        const response = await getAllMenuItems();
+        setMenuItems(response.data || []);
+        setLoading({ isLoading: false, error: null });
+      } catch (error) {
+        console.error("Error fetching menu items:", error);
+        setLoading({
+          isLoading: false,
+          error: "Failed to load menu items. Please try again later.",
+        });
+      }
+    };
+
+    fetchMenuItems();
+  }, []);
+
+  // Get unique categories from menu items, sorted by display_order (dedupe by name)
+  const categoryNameToOrder = new Map<string, number>();
+  menuItems.forEach((item) => {
+    if (!item.active || !item.category?.name) return;
+    const name = item.category.name;
+    const order = item.category.display_order ?? 0;
+    if (!categoryNameToOrder.has(name)) {
+      categoryNameToOrder.set(name, order);
+    } else {
+      categoryNameToOrder.set(
+        name,
+        Math.min(categoryNameToOrder.get(name)!, order)
+      );
+    }
+  });
+  const categories = Array.from(categoryNameToOrder.entries())
+    .sort((a, b) => a[1] - b[1])
+    .map(([name]) => name);
 
   const handleAddToCart = () => {
     if (!selectedItem) return;
 
-    // รวมราคา option
-    let optionPrice = 0;
-    selectedItem.options?.forEach((opt) => {
-      const val = selectedOptions[opt.name];
-      const choice = opt.choices.find((c) => c.label === val);
-      if (choice) optionPrice += choice.price;
+    // Calculate modifier prices
+    let modifierPrice = 0;
+    selectedExtras.forEach((modifierId) => {
+      const modifier = selectedItem.modifiers?.find((m) => m.id === modifierId);
+      if (modifier) modifierPrice += modifier.price_baht;
     });
 
-    // รวมราคา extras ตามจริง
-    let extraPrice = 0;
-    selectedExtras.forEach((extraLabel) => {
-      const extra = selectedItem.extras?.find((e) => e.label === extraLabel);
-      if (extra) extraPrice += extra.price;
-    });
-
-    const totalPrice = selectedItem.price + optionPrice + extraPrice;
+    const totalPrice = selectedItem.price_baht + modifierPrice;
     const uniqueId = `${selectedItem.id}-${JSON.stringify({
-      selectedOptions,
       selectedExtras,
       customText,
     })}`;
 
     addItem({
-      id: selectedItem.id,
+      id: parseInt(selectedItem.id), // Convert string to number for cart
       name: selectedItem.name,
       price: totalPrice,
       quantity: quantity,
       options: {
-        ...selectedOptions,
-        Extras: selectedExtras.join(", "),
+        Modifiers: selectedExtras
+          .map((id) => {
+            const modifier = selectedItem.modifiers?.find((m) => m.id === id);
+            return modifier?.name || id;
+          })
+          .join(", "),
         Custom: customText,
       },
       uniqueId,
@@ -79,17 +142,65 @@ export default function MenuPage() {
     setQuantity(1);
   };
 
-  const handleOptionChange = (optionName: string, value: string) => {
-    setSelectedOptions((prev) => ({ ...prev, [optionName]: value }));
-  };
-
-  const handleExtraToggle = (extraLabel: string) => {
+  const handleModifierToggle = (modifierId: string) => {
     setSelectedExtras((prev) =>
-      prev.includes(extraLabel)
-        ? prev.filter((e) => e !== extraLabel)
-        : [...prev, extraLabel]
+      prev.includes(modifierId)
+        ? prev.filter((id) => id !== modifierId)
+        : [...prev, modifierId]
     );
   };
+
+  // Format price in Thai Baht
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("th-TH", {
+      style: "currency",
+      currency: "THB",
+    }).format(price);
+  };
+
+  // Filter menu items based on search and active status
+  const filteredItems = menuItems.filter(
+    (item) =>
+      item.active && // Only show active items
+      (item.name.toLowerCase().includes(search.toLowerCase()) ||
+        item.description?.toLowerCase().includes(search.toLowerCase()) ||
+        item.category?.name.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  // Loading state
+  if (loading.isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-gray-600">Loading menu items...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (loading.error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{loading.error}</p>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (menuItems.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">No menu items available</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -120,41 +231,32 @@ export default function MenuPage() {
 
         {/* All Menu */}
         <TabsContent value="All">
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {menuItems
-              .filter(
-                (item) =>
-                  item.name.toLowerCase().includes(search.toLowerCase()) ||
-                  item.description.toLowerCase().includes(search.toLowerCase())
-              )
-              .map((item) => (
-                <MenuCard
-                  key={item.id}
-                  item={item}
-                  onAddToCart={() => setSelectedItem(item)}
-                />
-              ))}
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredItems.map((item, index) => (
+              <MenuCard
+                key={item.id}
+                item={item}
+                index={index}
+                onAddToCart={() => setSelectedItem(item)}
+                formatPrice={formatPrice}
+              />
+            ))}
           </div>
         </TabsContent>
 
         {/* By Category */}
         {categories.map((category) => (
           <TabsContent key={category} value={category}>
-            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {menuItems
-                .filter(
-                  (item) =>
-                    item.category === category &&
-                    (item.name.toLowerCase().includes(search.toLowerCase()) ||
-                      item.description
-                        .toLowerCase()
-                        .includes(search.toLowerCase()))
-                )
-                .map((item) => (
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredItems
+                .filter((item) => item.category?.name === category)
+                .map((item, index) => (
                   <MenuCard
                     key={item.id}
                     item={item}
+                    index={index}
                     onAddToCart={() => setSelectedItem(item)}
+                    formatPrice={formatPrice}
                   />
                 ))}
             </div>
@@ -174,45 +276,32 @@ export default function MenuPage() {
             </DialogHeader>
 
             <div className="space-y-4">
-              <p className="text-gray-600">{selectedItem.description}</p>
+              {selectedItem.description && (
+                <p className="text-gray-600">{selectedItem.description}</p>
+              )}
 
-              {/* Option เลือก 1 อย่าง */}
-              {selectedItem.options?.map((opt) => (
-                <div key={opt.name}>
-                  <label className="font-medium">{opt.name}:</label>
-                  <select
-                    className="w-full border rounded p-2 mt-1"
-                    value={selectedOptions[opt.name] || opt.choices[0].label}
-                    onChange={(e) =>
-                      handleOptionChange(opt.name, e.target.value)
-                    }
-                  >
-                    {opt.choices.map((choice) => (
-                      <option key={choice.label} value={choice.label}>
-                        {choice.label}{" "}
-                        {choice.price !== 0 ? `(+฿${choice.price})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-
-              {/* Extra เลือกหลายอย่าง */}
-              {selectedItem.extras && (
+              {/* Modifiers เลือกหลายอย่าง */}
+              {selectedItem.modifiers && selectedItem.modifiers.length > 0 && (
                 <div>
-                  <label className="font-medium">Extras:</label>
-                  <div className="flex flex-col gap-1 mt-2">
-                    {selectedItem.extras.map((extra) => (
+                  <label className="font-medium">Modifiers:</label>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {selectedItem.modifiers.map((modifier) => (
                       <label
-                        key={extra.label}
-                        className="flex items-center gap-2"
+                        key={modifier.id}
+                        className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50"
                       >
                         <input
                           type="checkbox"
-                          checked={selectedExtras.includes(extra.label)}
-                          onChange={() => handleExtraToggle(extra.label)}
+                          checked={selectedExtras.includes(modifier.id)}
+                          onChange={() => handleModifierToggle(modifier.id)}
+                          className="rounded"
                         />
-                        {extra.label} (+฿{extra.price})
+                        <span className="flex-1">{modifier.name}</span>
+                        {modifier.price_baht > 0 && (
+                          <span className="text-sm text-green-600">
+                            +{formatPrice(modifier.price_baht)}
+                          </span>
+                        )}
                       </label>
                     ))}
                   </div>
@@ -265,11 +354,80 @@ export default function MenuPage() {
             </div>
 
             <DialogFooter>
-              <Button onClick={handleAddToCart}>Add to Cart</Button>
+              <Button onClick={handleAddToCart} className="w-full">
+                เพิ่มลงตะกร้า
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
     </div>
+  );
+}
+
+// MenuCard Component with Framer Motion
+interface MenuCardProps {
+  item: MenuItem;
+  index: number;
+  onAddToCart: () => void;
+  formatPrice: (price: number) => string;
+}
+
+function MenuCard({ item, index, onAddToCart, formatPrice }: MenuCardProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.1 }}
+      whileHover={{ y: -5 }}
+      className="h-full"
+    >
+      <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 h-full flex flex-col">
+        <div className="relative h-48">
+          {item.image_url ? (
+            <Image
+              src={item.image_url}
+              alt={item.name}
+              width={400}
+              height={300}
+              className="object-cover w-full h-full"
+              priority
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-500 text-sm">No Image</span>
+            </div>
+          )}
+          {item.category && (
+            <Badge className="absolute top-2 right-2 bg-white/90 text-gray-800 hover:bg-white/90">
+              {item.category.name}
+            </Badge>
+          )}
+        </div>
+
+        <CardContent className="p-4 flex-1 flex flex-col">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="font-semibold text-lg line-clamp-2">{item.name}</h3>
+            <span className="font-medium text-green-600 ml-2 flex-shrink-0">
+              {formatPrice(item.price_baht)}
+            </span>
+          </div>
+          {item.description && (
+            <p className="text-sm text-gray-600 line-clamp-2 flex-1">
+              {item.description}
+            </p>
+          )}
+        </CardContent>
+
+        <CardFooter className="p-4 pt-0">
+          <Button
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={onAddToCart}
+          >
+            เพิ่มลงตะกร้า
+          </Button>
+        </CardFooter>
+      </Card>
+    </motion.div>
   );
 }

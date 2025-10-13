@@ -4,7 +4,7 @@ import { Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { CartItem as CartItemType } from "@/lib/cart-context";
-import { menuItems, MenuItem } from "@/lib/data";
+import { formatPrice } from "@/lib/utils";
 
 interface CartItemProps {
   item: CartItemType;
@@ -16,73 +16,95 @@ interface CartItemProps {
   onRemove: (id: string, options?: Record<string, string | number>) => void;
 }
 
+/**
+ * CartItem Component
+ * ✅ รองรับ item จาก backend / context
+ * ✅ คำนวณราคารวมรวม extras + options
+ * ✅ ปลอดภัยจาก undefined fields
+ */
 export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
-  // หา menuItem ของจริง
-  const menuItem = menuItems.find((m) => m.id === item.id);
+  // ราคาฐาน
+  const basePrice = item.price ?? 0;
 
-  // Base price
-  const basePrice = menuItem?.price || item.price;
-
-  // แปลง options เป็น array สำหรับโชว์
+  // Option entries (เช่น size, topping)
   const optionEntries =
-    menuItem?.options?.map((opt) => {
-      const selected = item.options?.[opt.name] as string;
-      const found = opt.choices.find((c) => c.label === selected);
-      const price = found?.price || 0;
-      return { name: opt.name, value: selected, price };
-    }) || [];
-
-  // แปลง extras
-  const extrasEntries =
-    item.options?.Extras && menuItem?.extras
-      ? ((item.options.Extras as string)
-          .split(", ")
-          .map((label) => {
-            const found = menuItem.extras?.find((e) => e.label === label);
-            return found ? { label: found.label, price: found.price } : null;
-          })
-          .filter(Boolean) as { label: string; price: number }[])
+    item.options && typeof item.options === "object"
+      ? Object.entries(item.options)
+          .filter(([key]) => key !== "Extras" && key !== "Custom")
+          .map(([key, value]) => ({ name: key, value }))
       : [];
+
+  // Extras (Array หรือ string แยกด้วย comma)
+  const extrasEntries: { label: string; price: number }[] = (() => {
+    const extrasRaw = item.options?.Extras;
+    if (!extrasRaw) return [];
+    if (Array.isArray(extrasRaw)) {
+      return extrasRaw.map((e: any) =>
+        typeof e === "string" ? { label: e, price: 0 } : e
+      );
+    }
+    if (typeof extrasRaw === "string") {
+      return extrasRaw.split(",").map((label) => ({
+        label: label.trim(),
+        price: 0,
+      }));
+    }
+    return [];
+  })();
+
+  // ราคาทั้งหมด
+  const totalOptionPrice = optionEntries.reduce((sum, o) => {
+    const price = typeof o.value === "number" ? o.value : 0;
+    return sum + price;
+  }, 0);
+
+  const totalExtrasPrice = extrasEntries.reduce((sum, e) => sum + e.price, 0);
+
+  const totalPrice =
+    (basePrice + totalOptionPrice + totalExtrasPrice) * item.quantity;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex justify-between items-start">
-          <div>
-            {/* ชื่ออาหาร + Base Price */}
+          <div className="flex-1">
+            {/* 🔹 ชื่ออาหาร + Base Price */}
             <h3 className="font-medium">
-              {item.name}{" "}
-              <span className="text-xs text-gray-400">฿{basePrice}</span>
+              {item.name}
+              <span className="text-xs text-gray-400 ml-1">
+                {formatPrice(basePrice)}
+              </span>
             </h3>
 
-            {/* Options */}
+            {/* 🔸 Options */}
             {optionEntries.length > 0 && (
               <div className="text-sm text-gray-500 mt-1 space-y-1">
                 {optionEntries.map((opt) => (
                   <div key={opt.name} className="flex justify-between">
                     <span>
-                      {opt.name}: {opt.value}
+                      {opt.name}: {String(opt.value)}
                     </span>
-                    <span>+{opt.price}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Extras */}
+            {/* 🔸 Extras */}
             {extrasEntries.length > 0 && (
               <div className="text-sm text-gray-500 mt-1 space-y-1">
                 <span>Extras:</span>
                 {extrasEntries.map((extra) => (
                   <div key={extra.label} className="flex justify-between">
                     <span>{extra.label}</span>
-                    <span>+{extra.price}</span>
+                    <span>
+                      {extra.price > 0 && `+${formatPrice(extra.price)}`}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Custom */}
+            {/* 🔸 Custom note */}
             {item.options?.Custom && (
               <div className="text-sm text-gray-500 mt-1">
                 <span>Custom: {item.options.Custom}</span>
@@ -90,7 +112,7 @@ export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
             )}
           </div>
 
-          {/* Quantity / Remove */}
+          {/* 🔹 Quantity controls */}
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -99,7 +121,7 @@ export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
               onClick={() =>
                 onUpdateQuantity(
                   item.uniqueId,
-                  Math.max(0, item.quantity - 1),
+                  Math.max(1, item.quantity - 1),
                   item.options
                 )
               }
@@ -128,8 +150,9 @@ export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
           </div>
         </div>
 
+        {/* 🔹 Total */}
         <div className="mt-2 text-right font-medium">
-          Total: ฿{item.price * item.quantity}
+          Total: {formatPrice(totalPrice)}
         </div>
       </CardContent>
     </Card>
