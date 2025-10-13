@@ -1,114 +1,162 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ShoppingCart, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
 import { CartItem } from "@/components/CartItem";
 import { useCart } from "@/lib/cart-context";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
+
 import {
   createOrder,
   addItemsToOrder,
   updateTableStatus,
-  createPayment,
+  // createPayment, // ถ้าอยากจ่ายทันที ค่อยเปิดใช้
 } from "@/lib/api";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
-const DEFAULT_TABLE_ID =
-  process.env.NEXT_PUBLIC_DEFAULT_TABLE_ID ||
-  "4fe752c9-d7ed-4e87-8303-dfcabbd2bfd7"; // ← ใช้ตัวอย่างของคุณ
+import { getActiveTable, setActiveTable } from "@/lib/table-session";
+
+// สำรองสุดท้ายถ้าไม่พบ tableId จาก URL/Session
+const FALLBACK_TABLE_ID =
+  process.env.NEXT_PUBLIC_DEFAULT_TABLE_ID || "TAKEAWAY";
 
 export default function CartPage() {
+  const router = useRouter();
+  const params = useSearchParams();
+
   const { state, updateQty, removeItem, clearCart } = useCart();
   const { items, subtotal } = state;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+
+  // 1) resolve tableId: URL -> localStorage -> fallback
+  const resolvedTableId = useMemo(() => {
+    const fromUrl =
+      params.get("tableId") || params.get("table") || params.get("t");
+    if (fromUrl) return fromUrl;
+    const fromSession = getActiveTable()?.id;
+    if (fromSession) return fromSession;
+    return FALLBACK_TABLE_ID;
+  }, [params]);
+
+  // ถ้า URL มี tableId ให้ cache ลง session ไว้ด้วย
+  useEffect(() => {
+    const fromUrl =
+      params.get("tableId") || params.get("table") || params.get("t");
+    if (fromUrl) {
+      const name = params.get("name") || undefined;
+      setActiveTable({ id: fromUrl, name });
+    }
+  }, [params]);
 
   const handleCheckout = async () => {
     if (items.length === 0 || isSubmitting) return;
+
     setIsSubmitting(true);
     setError(null);
 
     try {
-      /* 1) Create order: { table_id, source, note } */
+      // 2) สร้างออเดอร์ (รู้โต๊ะ)
       const orderBody = {
-        table_id: DEFAULT_TABLE_ID,
+        table_id: resolvedTableId,
         source: "customer",
-        note: "", // จะทำช่องกรอกจาก UI ภายหลังก็ได้
+        note: "", // ถ้าจะมีช่องกรอก note ค่อยต่อยอด
       };
-      console.log("== createOrder body ==", orderBody);
       const orderRes = await createOrder(orderBody);
       const orderData = (orderRes as any)?.data ?? orderRes;
       const orderId = String(orderData?.id ?? orderData?.order_id ?? "");
       if (!orderId) throw new Error("ไม่สามารถสร้างออเดอร์ได้ (orderId ว่าง)");
 
-      /* 2) Loop add items: { menu_item_id, quantity, note, modifier_ids } */
-      for (const i of items) {
-        const payload = {
-          menu_item_id: String(i.menuItemId ?? ""),
-          quantity: Number(i.quantity ?? 1),
-          note: i.note || "",
-          modifier_ids: Array.isArray(i.modifiers)
-            ? i.modifiers.map((m: any) => (typeof m === "string" ? m : m.id))
-            : [],
-        };
-        console.log(`== addItemsToOrder body (order:${orderId}) ==`, payload);
+      // 3) เตรียม payload รายการในตะกร้าอย่างปลอดภัย
+      // - กันเคสไม่มี menuItemId
+      // - map modifiers ให้เป็น id array (modifier_ids)
+      const validItems = items
+        .map((i) => {
+          const menuItemId = String(
+            (i as any).menuItemId ?? (i as any).id ?? ""
+          );
+          const quantity = Math.max(1, Number(i.quantity ?? 1));
+          if (!menuItemId) return null;
+
+          const modifier_ids = Array.isArray(i.modifiers)
+            ? i.modifiers
+                .map((m: any) => (typeof m === "string" ? m : m?.id))
+                .filter(Boolean)
+            : [];
+
+          return {
+            menu_item_id: menuItemId,
+            quantity,
+            note: (i as any).note || "",
+            modifier_ids,
+          };
+        })
+        .filter(Boolean) as Array<{
+        menu_item_id: string;
+        quantity: number;
+        note: string;
+        modifier_ids: string[];
+      }>;
+
+      if (validItems.length === 0) {
+        throw new Error("ไม่พบรายการอาหารที่ถูกต้องในตะกร้า");
+      }
+
+      // 4) ยิง addItemsToOrder ทีละตัว (หรือ Promise.all ก็ได้)
+      for (const payload of validItems) {
         await addItemsToOrder(orderId, payload as any);
       }
 
-      /* 3) Update table status -> "occupied" (หรือ "billing" แล้วแต่ backend) */
-      await updateTableStatus(DEFAULT_TABLE_ID, "occupied");
+      // 5) อัปเดตสถานะโต๊ะ (ถ้าระบบกำหนด เช่น occupied/billing)
+      try {
+        await updateTableStatus(resolvedTableId, "occupied");
+      } catch (e) {
+        // ไม่ให้ขั้นตอนล้ม ถ้า endpoint นี้ไม่จำเป็น/ไม่พร้อม
+        console.warn("updateTableStatus failed:", e);
+      }
 
-      /* 4) Create payment (PENDING) — ส่ง payload ให้ครบ */
-      // const amount = Math.max(0, Math.round(subtotal)); // จำนวนเต็มบาท
-      // const provider = "SCB";
-      // const providerRef = `PP-${new Date()
-      //   .toISOString()
-      //   .slice(0, 10)
-      //   .replace(/-/g, "")}-${orderId.slice(0, 6)}`;
-
+      // 6) (ทางเลือก) สร้าง payment ตอนนี้เลย — ค่อยเปิดใช้ภายหลัง
+      // const amount = Math.max(0, Math.round(subtotal));
       // const paymentRes = await createPayment({
       //   order_id: orderId,
-      //   method: "promptpay",
+      //   method: "cash",
       //   amount_baht: amount,
-      //   provider,
-      //   provider_ref: providerRef,
       // });
       // const paymentData = (paymentRes as any)?.data ?? paymentRes;
       // const paymentId = String(paymentData?.id ?? "");
 
-      /* 5) Save to local history */
+      // 7) เก็บ recentOrders ฝั่ง client ไว้เป็น history (offline/guest)
       try {
         const now = new Date().toISOString();
-        const recentRaw = localStorage.getItem("recentOrders");
-        const recent = recentRaw ? JSON.parse(recentRaw) : [];
+        const raw = localStorage.getItem("recentOrders");
+        const recent = raw ? JSON.parse(raw) : [];
         recent.unshift({
           id: orderId,
           created_at: now,
-          table_id: DEFAULT_TABLE_ID,
+          table_id: resolvedTableId,
           total: subtotal,
-          items: items.map((i) => ({
-            menu_item_id: String(i.menuItemId ?? ""),
-            quantity: Number(i.quantity ?? 1),
+          items: validItems.map((i) => ({
+            menu_item_id: i.menu_item_id,
+            quantity: i.quantity,
           })),
         });
         localStorage.setItem(
           "recentOrders",
           JSON.stringify(recent.slice(0, 10))
         );
-      } catch (e) {
-        console.warn("save recentOrders failed:", e);
-      }
+      } catch {}
 
-      /* 6) Clear cart & redirect */
+      // 8) ล้างตะกร้า + เปลี่ยนหน้า
       clearCart();
-      // if (paymentId) router.push(`/payments/${paymentId}`);
-      // else router.push(`/orders/${orderId}`);
       toast.success("รับออเดอร์เรียบร้อย");
-      router.push("/menu");
+      // ไปหน้าชำระเงินใหม่ หรือกลับไปเลือกเมนูโต๊ะเดิม
+      // router.push(`/payment/new?orderId=${orderId}`);
+      router.push(`/menu?tableId=${encodeURIComponent(resolvedTableId)}`);
     } catch (err: any) {
       console.error("Checkout error:", err);
       const msg =
@@ -122,7 +170,7 @@ export default function CartPage() {
     }
   };
 
-  if (items.length === 0)
+  if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <ShoppingCart className="w-16 h-16 text-gray-400 mb-4" />
@@ -130,14 +178,16 @@ export default function CartPage() {
         <p className="text-gray-600">Add some items first</p>
       </div>
     );
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+      {/* แสดงโต๊ะปัจจุบัน */}
+      <div className="flex justify-between items-center mb-2">
         <h2 className="text-2xl font-semibold">My Cart</h2>
-        <Button variant="ghost" onClick={clearCart}>
-          Clear Cart
-        </Button>
+        <div className="text-sm text-muted-foreground">
+          โต๊ะ: <span className="font-medium">{resolvedTableId}</span>
+        </div>
       </div>
 
       <div className="space-y-4">
