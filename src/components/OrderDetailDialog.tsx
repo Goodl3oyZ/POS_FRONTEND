@@ -9,19 +9,38 @@ import {
   DialogClose,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { Order, OrderItem } from "@/lib/data";
-import { calculateItemTotal } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
+
+// API Response Types (matching orders/page.tsx)
+type OrderItem = {
+  id: string;
+  menu_item_name: string;
+  quantity: number;
+  unit_price_baht?: number;
+  line_total_baht?: number;
+  note?: string;
+};
+
+type Order = {
+  id: string;
+  table_id?: string;
+  table_name?: string;
+  source?: string;
+  status?: string;
+  subtotal_baht?: number;
+  discount_baht?: number;
+  total_baht?: number;
+  note?: string;
+  created_at?: string;
+  closed_at?: string | null;
+  items?: OrderItem[];
+};
 
 interface OrderDetailDialogProps {
-  order: Order & {
-    items: (OrderItem & {
-      options?: Record<string, string>;
-      extras?: string[];
-    })[];
-  };
+  order: Order;
   open: boolean;
-  onOpenChange: (order: Order | null) => void; // ใช้ Order | null
-  onUpdateStatus: (orderId: string, status: Order["status"]) => void;
+  onOpenChange: (order: Order | null) => void;
+  onUpdateStatus: (orderId: string, status: string) => void;
 }
 export function OrderDetailDialog({
   order,
@@ -37,55 +56,87 @@ export function OrderDetailDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <p>
-            <strong>Table:</strong> {order.tableId}
-          </p>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <strong>Table:</strong> {order.table_name || "-"}
+            </div>
+            <div>
+              <strong>Status:</strong> {order.status || "-"}
+            </div>
+            <div>
+              <strong>Source:</strong> {order.source || "-"}
+            </div>
+            <div>
+              <strong>Created:</strong>{" "}
+              {order.created_at
+                ? new Date(order.created_at).toLocaleString("th-TH")
+                : "-"}
+            </div>
+          </div>
+
+          {order.note && (
+            <div>
+              <strong>Note:</strong> {order.note}
+            </div>
+          )}
 
           <div className="space-y-2">
-            {order.items.map((item, index) => (
-              <div key={index} className="border rounded p-2">
-                <p className="font-medium">
-                  {item.menuItem.name} x{item.quantity}
-                </p>
-                {item.selectedOptions && (
-                  <p className="text-sm text-gray-600">
-                    Options:{" "}
-                    {Object.entries(item.selectedOptions)
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join(", ")}
+            <strong>Items:</strong>
+            {order.items && order.items.length > 0 ? (
+              order.items.map((item, index) => (
+                <div key={item.id || index} className="border rounded p-2">
+                  <p className="font-medium">
+                    {item.menu_item_name} × {item.quantity}
                   </p>
-                )}
-                {item.selectedExtras && item.selectedExtras.length > 0 && (
+                  {item.note && (
+                    <p className="text-sm text-gray-600">Note: {item.note}</p>
+                  )}
                   <p className="text-sm text-gray-600">
-                    Extras: {item.selectedExtras.map((e) => e.label).join(", ")}
+                    Price: {formatPrice(Number(item.line_total_baht || 0))}
                   </p>
-                )}
-                <p className="text-sm text-gray-600">
-                  Price: ฿{calculateItemTotal(item)}
-                </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500">No items</p>
+            )}
+          </div>
+
+          <div className="border-t pt-2">
+            <div className="flex justify-between text-sm">
+              <span>Subtotal:</span>
+              <span>{formatPrice(Number(order.subtotal_baht || 0))}</span>
+            </div>
+            {order.discount_baht && order.discount_baht > 0 && (
+              <div className="flex justify-between text-sm">
+                <span>Discount:</span>
+                <span>-{formatPrice(Number(order.discount_baht))}</span>
               </div>
-            ))}
+            )}
+            <div className="flex justify-between font-semibold">
+              <span>Total:</span>
+              <span>{formatPrice(Number(order.total_baht || 0))}</span>
+            </div>
           </div>
         </div>
 
         <DialogFooter className="flex justify-between">
           <Button
             variant="outline"
-            onClick={() => onUpdateStatus(order.id, "Preparing")}
+            onClick={() => onUpdateStatus(order.id, "preparing")}
           >
             Preparing
           </Button>
           <Button
             variant="secondary"
-            onClick={() => onUpdateStatus(order.id, "Done")}
+            onClick={() => onUpdateStatus(order.id, "paid")}
           >
-            Done
+            Mark as Paid
           </Button>
           <Button
             variant="destructive"
-            onClick={() => onUpdateStatus(order.id, "Cancelled")}
+            onClick={() => onUpdateStatus(order.id, "void")}
           >
-            Cancelled
+            Void Order
           </Button>
         </DialogFooter>
       </DialogContent>

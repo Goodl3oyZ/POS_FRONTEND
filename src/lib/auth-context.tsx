@@ -2,10 +2,20 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api } from "@/lib/api/config";
 
-interface User {
+export interface AppUser {
   id: string;
   username: string;
-  role?: string;
+  full_name: string | null;
+  email: string;
+  phone: string | null;
+  status: "active" | "inactive" | string;
+  roles: string[] | null;
+}
+
+// ถ้าอยากให้ชื่อ interface คือ "User" และมีทั้ง user + permissions ตามที่ขอ
+export interface User {
+  user: AppUser;
+  permissions: string[];
 }
 
 interface AuthContextType {

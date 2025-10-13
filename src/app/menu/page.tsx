@@ -151,22 +151,67 @@ export default function MenuPage() {
   return (
     <div className="mx-auto max-w-6xl p-6 space-y-6">
       {/* Category filter */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={!selectedCategory ? "default" : "outline"}
+      {/* Category Segmented Pills */}
+      <div
+        role="tablist"
+        aria-label="Filter categories"
+        className="flex items-center gap-2 overflow-x-auto py-1"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-pressed={selectedCategory === null}
+          data-active={selectedCategory === null}
           onClick={() => setSelectedCategory(null)}
+          className={[
+            "relative rounded-full border px-4 py-2 text-sm font-medium",
+            "bg-white text-gray-700 border-gray-200",
+            "shadow-sm hover:shadow transition-all hover:-translate-y-0.5",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500",
+            // state styles
+            "data-[active=true]:bg-gray-600 data-[active=true]:text-white data-[active=true]:border-gray-600",
+            "data-[active=true]:shadow-md data-[active=true]:shadow-gray-200",
+          ].join(" ")}
         >
           ทั้งหมด
-        </Button>
-        {categories.map((c) => (
-          <Button
-            key={c.id}
-            variant={selectedCategory === c.id ? "default" : "outline"}
-            onClick={() => setSelectedCategory(c.id)}
-          >
-            {c.name}
-          </Button>
-        ))}
+          {/* underline */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -bottom-1 left-3 right-3 h-0.5 rounded-full bg-gray-600 opacity-0 transition-opacity data-[active=true]:opacity-100"
+            data-active={selectedCategory === null}
+          />
+        </button>
+
+        {categories.map((c) => {
+          const isActive = selectedCategory === c.id;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-pressed={isActive}
+              data-active={isActive}
+              onClick={() => setSelectedCategory(c.id)}
+              className={[
+                "relative rounded-full border px-4 py-2 text-sm font-medium",
+                "bg-white text-gray-700 border-gray-200",
+                "shadow-sm hover:shadow transition-all hover:-translate-y-0.5",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500",
+                // state styles
+                "data-[active=true]:bg-gray-600 data-[active=true]:text-white data-[active=true]:border-gray-600",
+                "data-[active=true]:shadow-md data-[active=true]:shadow-gray-200",
+              ].join(" ")}
+            >
+              {c.name}
+              {/* underline */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -bottom-1 left-3 right-3 h-0.5 rounded-full bg-gray-600 opacity-0 transition-opacity data-[active=true]:opacity-100"
+                data-active={isActive}
+              />
+            </button>
+          );
+        })}
       </div>
 
       {/* Menu grid */}

@@ -182,32 +182,147 @@ export default function CartPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* แสดงโต๊ะปัจจุบัน */}
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-semibold">My Cart</h2>
+      {/* หัวข้อ + โต๊ะปัจจุบัน + จำนวนรายการ */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-2xl font-semibold">My Cart</h2>
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+            {items.reduce((n, it) => n + Number(it.quantity || 0), 0)} รายการ
+          </span>
+        </div>
         <div className="text-sm text-muted-foreground">
           โต๊ะ: <span className="font-medium">{resolvedTableId}</span>
         </div>
       </div>
 
-      <div className="space-y-4">
-        {items.map((item) => (
-          <CartItem
-            key={item.uniqueId}
-            item={item}
-            onUpdateQuantity={(id, quantity) => updateQty(id, quantity)}
-            onRemove={(id) => removeItem(id)}
-          />
-        ))}
+      {/* รายการสินค้าแบบสวยๆ */}
+      <div className="space-y-3">
+        {items.map((it) => {
+          const mods = Array.isArray(it.modifiers) ? it.modifiers : [];
+          const modsTotal =
+            mods.reduce((s: number, m: any) => s + Number(m?.price ?? 0), 0) ||
+            0;
+
+          const unitBase =
+            Number((it as any).basePrice ?? (it as any).price ?? 0) || 0;
+          const unitPrice = unitBase + modsTotal;
+          const lineTotal = unitPrice * Number(it.quantity || 0);
+
+          return (
+            <div
+              key={it.uniqueId}
+              className="group flex gap-3 rounded-2xl border bg-white p-3 shadow-sm transition hover:shadow-md"
+            >
+              {/* รูปสินค้า */}
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+                {it.imageUrl ? (
+                  // ใช้ <img> ธรรมดาเพื่อไม่ต้องเพิ่ม import
+                  <img
+                    src={it.imageUrl}
+                    alt={it.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+              </div>
+
+              {/* รายละเอียด */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-medium">
+                      {it.name}
+                    </h3>
+                    <div className="truncate text-sm text-gray-500">
+                      ราคา/หน่วย: {formatPrice(unitPrice)}
+                    </div>
+                  </div>
+
+                  {/* ราคารวมต่อบรรทัด */}
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">รวม</div>
+                    <div className="text-base font-semibold">
+                      {formatPrice(lineTotal)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* modifiers เป็นชิป */}
+                {mods.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {mods.map((m: any, idx: number) => (
+                      <span
+                        key={`${it.uniqueId}-mod-${idx}`}
+                        className="rounded-full border bg-gray-50 px-2 py-0.5 text-xs text-gray-700"
+                      >
+                        {m?.name ?? "ตัวเลือก"}
+                        {Number(m?.price ?? 0) > 0
+                          ? ` +${formatPrice(Number(m.price))}`
+                          : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* note ถ้ามี */}
+                {(it as any).note ? (
+                  <div className="mt-1 truncate text-xs text-gray-500">
+                    หมายเหตุ: {(it as any).note}
+                  </div>
+                ) : null}
+
+                {/* ตัวคุมจำนวน + ลบ */}
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="inline-flex items-center gap-2 rounded-full border px-1 py-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateQty(
+                          it.uniqueId,
+                          Math.max(1, (it.quantity || 1) - 1)
+                        )
+                      }
+                      className="h-8 w-8 rounded-full text-gray-700 hover:bg-gray-100"
+                      aria-label="ลดจำนวน"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center text-sm font-medium">
+                      {it.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateQty(it.uniqueId, (it.quantity || 1) + 1)
+                      }
+                      className="h-8 w-8 rounded-full text-gray-700 hover:bg-gray-100"
+                      aria-label="เพิ่มจำนวน"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeItem(it.uniqueId)}
+                    className="rounded-full border px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    ลบ
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
+      {/* สรุปยอด + ปุ่มชำระ */}
       <Card className="mt-6 p-4">
-        <div className="flex justify-between items-center text-lg font-semibold mb-4">
+        <div className="mb-4 flex items-center justify-between text-lg font-semibold">
           <span>Total</span>
           <span>{formatPrice(subtotal)}</span>
         </div>
 
-        {error && <div className="text-red-600 text-sm mb-3">{error}</div>}
+        {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
 
         <Button
           className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60"

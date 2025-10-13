@@ -67,10 +67,7 @@ export function Topbar() {
                 <UserCircle className="h-6 w-6 text-gray-600" />
                 <div className="truncate text-right">
                   <p className="truncate text-sm font-medium">
-                    {user.username}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {user.role === "admin" ? "ผู้ดูแลระบบ" : "พนักงาน"}
+                    {user.user.full_name}
                   </p>
                 </div>
               </div>

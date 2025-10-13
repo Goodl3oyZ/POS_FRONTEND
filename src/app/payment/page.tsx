@@ -1,5 +1,5 @@
 "use client";
-
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,7 @@ export default function PaymentPage() {
   const [providerRef, setProviderRef] = useState<string>(""); // optional
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const PROMPTPAY_QR_SRC = "/images/qrpromptpay.jpg";
 
   // โหลดตาราง + ออเดอร์เปิดอยู่
   const loadTables = async () => {
@@ -327,33 +328,41 @@ export default function PaymentPage() {
               </div>
 
               {/* ช่อง optional สำหรับ provider / provider_ref */}
-              {(method === "promptpay" || method === "card") && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="provider">Provider (optional)</Label>
-                    <input
-                      id="provider"
-                      className="mt-1 w-full border rounded p-2"
-                      placeholder={
-                        method === "promptpay"
-                          ? "SCB / KBank ..."
-                          : "VISA / MasterCard ..."
-                      }
-                      value={provider}
-                      onChange={(e) => setProvider(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="providerRef">Provider Ref (optional)</Label>
-                    <input
-                      id="providerRef"
-                      className="mt-1 w-full border rounded p-2"
-                      placeholder={
-                        method === "promptpay" ? "PP-20251013-001" : "TXN-XXXX"
-                      }
-                      value={providerRef}
-                      onChange={(e) => setProviderRef(e.target.value)}
-                    />
+              {method === "promptpay" && (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="text-sm text-muted-foreground">
+                      สแกนเพื่อชำระ
+                    </div>
+                    <div className="text-2xl font-semibold">
+                      {formatPrice(tableTotal)}
+                    </div>
+
+                    {/* รูป QR ที่เตรียมไว้ */}
+                    <div className="bg-white p-3 rounded-lg">
+                      <Image
+                        src={PROMPTPAY_QR_SRC}
+                        alt="PromptPay QR"
+                        width={220}
+                        height={220}
+                        className="rounded-md"
+                        priority
+                      />
+                    </div>
+
+                    <a
+                      href={PROMPTPAY_QR_SRC}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs underline text-muted-foreground"
+                    >
+                      เปิดภาพขนาดใหญ่
+                    </a>
+
+                    <p className="text-xs text-muted-foreground text-center">
+                      ลูกค้าสแกนแล้วแสดงสลิปให้แคชเชียร์ตรวจสอบ จากนั้นกด
+                      “ยืนยันชำระ”
+                    </p>
                   </div>
                 </div>
               )}
