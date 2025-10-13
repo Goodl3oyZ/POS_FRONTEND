@@ -9,6 +9,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   options?: Record<string, string | number>;
+  totalPrice?: number;
 }
 
 interface CartState {
