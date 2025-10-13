@@ -1,3 +1,4 @@
+// components/Topbar.tsx
 "use client";
 
 import { LogOut, UserCircle, ShoppingCart } from "lucide-react";
@@ -12,7 +13,6 @@ export function Topbar() {
   const cart = useCart();
   const router = useRouter();
 
-  // รองรับทั้งรูปแบบ { state: { items } } และ { items }
   const cartItems = (cart as any)?.state?.items ?? (cart as any)?.items ?? [];
   const cartQty = Array.isArray(cartItems)
     ? cartItems.reduce((sum: number, i: any) => sum + (i?.quantity || 0), 0)
@@ -29,48 +29,42 @@ export function Topbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-      <div className="h-16 max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-        {/* Brand → คลิกแล้วไป /menu */}
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+        {/* กดที่แบรนด์ → ไป /menu */}
         <Link
           href="/menu"
-          className="inline-flex items-center gap-2 font-semibold text-lg tracking-tight rounded-md hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="inline-flex items-center gap-2 rounded-md text-lg font-semibold tracking-tight hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           <span className="hidden sm:inline">Restaurant POS</span>
           <span className="sm:hidden">POS</span>
         </Link>
 
-        {/* Right – ขึ้นกับสถานะผู้ใช้ */}
         {!user ? (
-          <div className="flex items-center gap-2">
-            <Button asChild>
-              <Link href="/login">เข้าสู่ระบบ</Link>
-            </Button>
-          </div>
+          <Button asChild>
+            <Link href="/login">เข้าสู่ระบบ</Link>
+          </Button>
         ) : (
           <div className="flex items-center gap-1 sm:gap-3">
             {/* Cart */}
             <Link
               href="/cart"
-              className="relative inline-flex items-center gap-2 rounded-md text-sm text-gray-700 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 px-2 py-2 sm:px-3 sm:py-2"
+              className="relative inline-flex items-center gap-2 rounded-md px-2 py-2 text-sm text-gray-700 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:px-3 sm:py-2"
               aria-label={`Cart, ${cartQty} items`}
             >
-              <ShoppingCart className="w-5 h-5" />
+              <ShoppingCart className="h-5 w-5" />
               <span className="hidden sm:inline">ตะกร้า</span>
               {cartQty > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 sm:-right-2 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-medium"
-                  aria-hidden="true"
-                >
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-medium text-white sm:-right-2">
                   {cartQty}
                 </span>
               )}
             </Link>
 
-            {/* User info (ย่อบนจอเล็ก) */}
-            <div className="hidden sm:flex items-center gap-2 max-w-[14rem]">
-              <UserCircle className="w-6 h-6 text-gray-600" />
-              <div className="text-right truncate">
-                <p className="text-sm font-medium truncate">{user.username}</p>
+            {/* User */}
+            <div className="hidden max-w-[14rem] items-center gap-2 sm:flex">
+              <UserCircle className="h-6 w-6 text-gray-600" />
+              <div className="truncate text-right">
+                <p className="truncate text-sm font-medium">{user.username}</p>
                 <p className="text-xs text-gray-500">
                   {user.role === "admin" ? "ผู้ดูแลระบบ" : "พนักงาน"}
                 </p>
@@ -78,7 +72,7 @@ export function Topbar() {
             </div>
             <div className="sm:hidden">
               <UserCircle
-                className="w-6 h-6 text-gray-600"
+                className="h-6 w-6 text-gray-600"
                 aria-hidden="true"
               />
             </div>
@@ -89,7 +83,6 @@ export function Topbar() {
               size="sm"
               onClick={handleLogout}
               className="gap-2 text-gray-700 hover:text-red-600"
-              aria-label="Logout"
             >
               <LogOut size={18} />
               <span className="hidden sm:inline">Logout</span>

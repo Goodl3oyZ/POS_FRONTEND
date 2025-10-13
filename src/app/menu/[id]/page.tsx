@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Minus, Plus } from "lucide-react";
-import { getMenuItemById } from "@/lib/api";
+import { getMenuItemById } from "@/lib/api"; // API ของคุณ (ต้องคืนรูปแบบเหมือนตัวอย่าง JSON)
 import { useCart } from "@/lib/cart-context";
 
+/** ===== Types ===== */
 interface Modifier {
   id: string;
   name: string;
@@ -26,41 +27,47 @@ interface MenuItemDetail {
   modifiers?: Modifier[];
 }
 
+/** ===== Page ===== */
 export default function MenuItemDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { addItem } = useCart();
+
   const [item, setItem] = useState<MenuItemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [quantity, setQuantity] = useState(1);
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
-  const [customText, setCustomText] = useState("");
+  const [customNote, setCustomNote] = useState("");
 
+  /** โหลดข้อมูลเมนูจาก API */
   useEffect(() => {
     const id = params?.id as string;
     if (!id) return;
     let mounted = true;
-    const run = async () => {
+
+    (async () => {
       try {
         setLoading(true);
         const res = await getMenuItemById(id);
-        if (!mounted) return;
-        setItem(res.data ?? null);
-        setError(null);
+        // ถ้า API คืน res.data หรือ res โดยตรง → ปรับตรงนี้ได้
+        const data = (res as any)?.data ?? res;
+        if (mounted) setItem(data);
       } catch (e) {
         console.error(e);
-        setError("ไม่สามารถโหลดเมนูได้");
+        if (mounted) setError("ไม่สามารถโหลดเมนูได้");
       } finally {
         if (mounted) setLoading(false);
       }
-    };
-    run();
+    })();
+
     return () => {
       mounted = false;
     };
   }, [params?.id]);
 
+  /** คำนวณราคาเพิ่มจาก modifiers */
   const extrasPrice = useMemo(() => {
     if (!item?.modifiers) return 0;
     return selectedExtras.reduce((sum, id) => {
@@ -73,6 +80,7 @@ export default function MenuItemDetailPage() {
     new Intl.NumberFormat("th-TH", {
       style: "currency",
       currency: "THB",
+      minimumFractionDigits: 0,
     }).format(price);
 
   const toggleExtra = (id: string) => {
@@ -81,42 +89,41 @@ export default function MenuItemDetailPage() {
     );
   };
 
-  const handleAdd = () => {
+  /** เพิ่มลงตะกร้า */
+  const handleAddToCart = () => {
     if (!item) return;
-    const price = item.price_baht + extrasPrice;
-    const uniqueId = `${item.id}-${JSON.stringify({
-      selectedExtras,
-      customText,
-    })}`;
+
+    // สร้าง modifiers ที่เลือกไว้
+    const selectedMods =
+      item.modifiers
+        ?.filter((m) => selectedExtras.includes(m.id))
+        .map((m) => ({ id: m.id, name: m.name, price: m.price_baht })) ?? [];
+
+    // ใช้ cart-context structure
     addItem({
-      id: parseInt(item.id),
-      uniqueId,
+      menuItemId: String(item.id),
       name: item.name,
-      price,
+      imageUrl: item.image_url,
+      basePrice: item.price_baht,
+      modifiers: selectedMods,
+      note: customNote,
       quantity,
-      options: {
-        Modifiers:
-          item.modifiers
-            ?.filter((m) => selectedExtras.includes(m.id))
-            .map((m) => m.name)
-            .join(", ") || "",
-        Custom: customText,
-      },
     });
+
     router.push("/cart");
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[300px] text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading...
+      <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading...
       </div>
     );
   }
 
   if (error || !item) {
     return (
-      <div className="text-center min-h-[300px] flex items-center justify-center">
+      <div className="flex min-h-[300px] items-center justify-center text-center">
         <div className="space-y-3">
           <p className="text-red-600">{error ?? "ไม่พบเมนู"}</p>
           <Button variant="outline" onClick={() => router.back()}>
@@ -128,7 +135,8 @@ export default function MenuItemDetailPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto grid gap-6 md:grid-cols-[1fr,360px]">
+    <div className="mx-auto max-w-3xl grid gap-6 md:grid-cols-[1fr,360px]">
+      {/* ==== Image & Description ==== */}
       <Card>
         <CardContent className="p-0">
           <div className="relative h-64 w-full bg-gray-100">
@@ -138,7 +146,7 @@ export default function MenuItemDetailPage() {
                 alt={item.name}
                 width={800}
                 height={400}
-                className="object-cover w-full h-full"
+                className="h-full w-full object-cover"
                 priority
               />
             ) : null}
@@ -148,9 +156,10 @@ export default function MenuItemDetailPage() {
               </Badge>
             ) : null}
           </div>
-          <div className="p-4 space-y-2">
+
+          <div className="space-y-2 p-4">
             <h1 className="text-xl font-semibold">{item.name}</h1>
-            <div className="text-green-700 font-medium">
+            <div className="font-medium text-green-700">
               {formatPrice(item.price_baht + extrasPrice)}
             </div>
             {item.description ? (
@@ -162,16 +171,18 @@ export default function MenuItemDetailPage() {
         </CardContent>
       </Card>
 
+      {/* ==== Options & Add ==== */}
       <Card>
-        <CardContent className="p-4 space-y-6">
-          {item.modifiers && item.modifiers.length > 0 ? (
+        <CardContent className="space-y-6 p-4">
+          {/* Modifiers */}
+          {item.modifiers && item.modifiers.length > 0 && (
             <div>
-              <div className="font-medium mb-2">Modifiers</div>
+              <div className="mb-2 font-medium">ตัวเลือกเพิ่มเติม</div>
               <div className="flex flex-col gap-2">
                 {item.modifiers.map((m) => (
                   <label
                     key={m.id}
-                    className="flex items-center gap-2 p-2 border rounded"
+                    className="flex items-center gap-2 rounded border p-2"
                   >
                     <input
                       type="checkbox"
@@ -180,30 +191,32 @@ export default function MenuItemDetailPage() {
                       onChange={() => toggleExtra(m.id)}
                     />
                     <span className="flex-1">{m.name}</span>
-                    {m.price_baht > 0 ? (
+                    {m.price_baht > 0 && (
                       <span className="text-sm text-green-600">
                         +{formatPrice(m.price_baht)}
                       </span>
-                    ) : null}
+                    )}
                   </label>
                 ))}
               </div>
             </div>
-          ) : null}
+          )}
 
+          {/* Custom Note */}
           <div>
-            <div className="font-medium mb-2">หมายเหตุ</div>
+            <div className="mb-2 font-medium">หมายเหตุ</div>
             <textarea
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              className="w-full border rounded p-2"
+              value={customNote}
+              onChange={(e) => setCustomNote(e.target.value)}
+              className="w-full rounded border p-2"
               placeholder="เพิ่มเติม..."
               rows={3}
             />
           </div>
 
+          {/* Quantity */}
           <div>
-            <div className="font-medium mb-2">จำนวน</div>
+            <div className="mb-2 font-medium">จำนวน</div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -223,7 +236,8 @@ export default function MenuItemDetailPage() {
             </div>
           </div>
 
-          <Button className="w-full" onClick={handleAdd}>
+          {/* Add to cart */}
+          <Button className="w-full" onClick={handleAddToCart}>
             เพิ่มลงตะกร้า
           </Button>
         </CardContent>

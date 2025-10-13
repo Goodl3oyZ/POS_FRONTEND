@@ -6,6 +6,7 @@ import { Topbar } from "@/components/Topbar";
 import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -37,6 +38,7 @@ export default function RootLayout({
               <main className="flex-1 overflow-y-auto p-6">
                 {/* <ProtectedRoute> */}
                 {children}
+                <Toaster position="top-center" richColors />
                 {/* </ProtectedRoute> */}
               </main>
             </div>

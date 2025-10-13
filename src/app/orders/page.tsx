@@ -5,9 +5,11 @@ import { OrderStatus } from "@/components/OrderStatus";
 import { OrderDetailDialog } from "@/components/OrderDetailDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getAllOrders, getOpenOrders } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
 
 export default function OrdersPage() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState({ all: true, open: true });
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,19 @@ export default function OrdersPage() {
         setError(null);
       } catch (e) {
         console.error(e);
-        setError("โหลดรายการออเดอร์ไม่สำเร็จ");
+        // Fallback: unauthenticated or API failed → use localStorage recent
+        try {
+          const raw = localStorage.getItem("recentOrders");
+          const recent = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(recent)) {
+            setOrders(recent);
+            setError(null);
+          } else {
+            setError("โหลดรายการออเดอร์ไม่สำเร็จ");
+          }
+        } catch {
+          setError("โหลดรายการออเดอร์ไม่สำเร็จ");
+        }
       } finally {
         if (isMounted) setLoading({ all: false, open: false });
       }
@@ -42,7 +56,7 @@ export default function OrdersPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   const ordersByStatus = useMemo(() => {
     const map: Record<string, any[]> = {};

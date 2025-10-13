@@ -5,11 +5,21 @@ import { TableCard } from "@/components/TableCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
-import { getAllTables } from "@/lib/api";
-import { getTableOrders } from "@/lib/api";
+import { getAllTables, getTableOrders } from "@/lib/api";
+import type { Table as UiTable } from "@/lib/data";
 import { Loader2 } from "lucide-react";
+
+/** แปลงสถานะจาก backend -> ป้ายที่ใช้ใน UI */
+function normalizeStatusLabel(raw?: string) {
+  const s = (raw || "").toLowerCase();
+  if (s === "free" || s === "available") return "Available";
+  if (s === "occupied") return "Occupied";
+  if (s === "billing") return "Billing";
+  if (s === "paid" || s === "succeeded") return "Paid";
+  // fallback: title-case
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "Unknown";
+}
 
 const statusConfig = {
   Available: {
@@ -28,29 +38,50 @@ const statusConfig = {
     variant: "secondary" as const,
     className: "bg-yellow-100 text-yellow-800",
   },
+  Unknown: {
+    variant: "secondary" as const,
+    className: "bg-gray-100 text-gray-800",
+  },
 } as const;
+
+type BackendTable = {
+  id: string;
+  name: string; // เช่น "T2"
+  seats: number; // ความจุ
+  status: string; // เช่น "free" | "occupied"
+  qr_code?: string;
+  area?: { id: string; name: string }; // เช่น { name: "Main Hall" }
+};
 
 export default function TablesPage() {
   const router = useRouter();
-  const [tables, setTables] = useState<any[]>([]);
+  const [tables, setTables] = useState<BackendTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [activeZone, setActiveZone] = useState<string>("");
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+
   const [tableOrders, setTableOrders] = useState<any[] | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    const run = async () => {
+    (async () => {
       try {
         setLoading(true);
         const res = await getAllTables();
         if (!mounted) return;
-        const data = Array.isArray(res.data) ? res.data : [];
+
+        const data: BackendTable[] = Array.isArray(res?.data) ? res.data : [];
         setTables(data);
-        const zones = Array.from(new Set(data.map((t: any) => t.zone || "")));
-        setActiveZone(zones[0] || "");
+
+        // ตั้งค่า zone เริ่มต้นจาก area.name
+        const zoneList = Array.from(
+          new Set(data.map((t) => t.area?.name || "Unknown"))
+        );
+        setActiveZone(zoneList[0] || "Unknown");
+
         setError(null);
       } catch (e) {
         console.error(e);
@@ -58,36 +89,44 @@ export default function TablesPage() {
       } finally {
         if (mounted) setLoading(false);
       }
-    };
-    run();
+    })();
     return () => {
       mounted = false;
     };
   }, []);
 
+  /** รายชื่อโซน (ใช้ area.name จาก backend) */
   const zones = useMemo(
-    () => Array.from(new Set(tables.map((t: any) => t.zone || ""))).sort(),
+    () =>
+      Array.from(new Set(tables.map((t) => t.area?.name || "Unknown"))).sort(),
     [tables]
   );
+
+  /** โต๊ะในโซนที่เลือก */
   const tablesInZone = useMemo(
-    () => tables.filter((t: any) => (t.zone || "") === activeZone),
+    () => tables.filter((t) => (t.area?.name || "Unknown") === activeZone),
     [tables, activeZone]
   );
+
+  /** โต๊ะที่เลือก */
   const selectedTableData = useMemo(
-    () => tablesInZone.find((t: any) => String(t.id) === String(selectedTable)),
-    [tablesInZone, selectedTable]
+    () => tables.find((t) => String(t.id) === String(selectedTable)),
+    [tables, selectedTable]
   );
 
+  /** ตัวเลขสถิติบนปุ่มโซน */
   const zoneStats = zones.map((zone) => {
-    const zoneTables = tables.filter((t: any) => (t.zone || "") === zone);
+    const zoneTables = tables.filter(
+      (t) => (t.area?.name || "Unknown") === zone
+    );
+    const statusLabels = zoneTables.map((t) => normalizeStatusLabel(t.status));
     return {
       zone,
       total: zoneTables.length,
-      available: zoneTables.filter((t: any) => t.status === "Available").length,
-      occupied: zoneTables.filter((t: any) => t.status === "Occupied").length,
-      billing: zoneTables.filter((t: any) =>
-        ["Billing", "Paid"].includes(t.status)
-      ).length,
+      available: statusLabels.filter((s) => s === "Available").length,
+      occupied: statusLabels.filter((s) => s === "Occupied").length,
+      billing: statusLabels.filter((s) => s === "Billing" || s === "Paid")
+        .length,
     };
   });
 
@@ -95,7 +134,7 @@ export default function TablesPage() {
     try {
       setLoadingOrders(true);
       const res = await getTableOrders(tableId);
-      setTableOrders(Array.isArray(res.data) ? res.data : []);
+      setTableOrders(Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
       console.error(e);
       setTableOrders([]);
@@ -157,19 +196,30 @@ export default function TablesPage() {
         <div className="text-red-600">{error}</div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
-          {tablesInZone.map((table: any) => (
-            <TableCard
-              key={table.id}
-              table={table}
-              onClick={() => {
-                const id = String(table.id);
-                setSelectedTable(id);
-                setTableOrders(null);
-                loadTableOrders(id);
-              }}
-              selected={selectedTable === table.id}
-            />
-          ))}
+          {tablesInZone.map((table) => {
+            const statusLabel = normalizeStatusLabel(table.status);
+            // สร้างอ็อบเจ็กต์ให้ตรงกับชนิด UiTable อย่างชัดเจน
+            const tableForCard: UiTable = {
+              id: String(table.id),
+              zone: table.area?.name || "Unknown",
+              status: statusLabel as UiTable["status"],
+              capacity: Number(table.seats ?? 0),
+              // currentOrder: undefined (optional)
+            };
+            return (
+              <TableCard
+                key={table.id}
+                table={tableForCard}
+                onClick={() => {
+                  const id = String(table.id);
+                  setSelectedTable(id);
+                  setTableOrders(null);
+                  loadTableOrders(id);
+                }}
+                selected={String(selectedTable) === String(table.id)}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -181,47 +231,40 @@ export default function TablesPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Table Details</h3>
-                <Badge
-                  variant={
-                    statusConfig[
-                      selectedTableData.status as keyof typeof statusConfig
-                    ]?.variant
-                  }
-                  className={
-                    statusConfig[
-                      selectedTableData.status as keyof typeof statusConfig
-                    ]?.className
-                  }
-                >
-                  {selectedTableData.status}
-                </Badge>
+                {(() => {
+                  const label = normalizeStatusLabel(selectedTableData.status);
+                  const cfg =
+                    statusConfig[label as keyof typeof statusConfig] ??
+                    statusConfig.Unknown;
+                  return (
+                    <Badge variant={cfg.variant} className={cfg.className}>
+                      {label}
+                    </Badge>
+                  );
+                })()}
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground">Table Number</p>
-                  <p className="font-medium">{selectedTableData.id}</p>
+                  <p className="text-sm text-muted-foreground">Table</p>
+                  {/* ใช้ชื่อโต๊ะจาก response เช่น "T2" */}
+                  <p className="font-medium">{selectedTableData.name}</p>
                 </div>
                 <div className="flex justify-between items-center">
                   <p className="text-sm text-muted-foreground">Zone</p>
-                  <p className="font-medium">{selectedTableData.zone}</p>
+                  <p className="font-medium">
+                    {selectedTableData.area?.name || "Unknown"}
+                  </p>
                 </div>
                 <div className="flex justify-between items-center">
                   <p className="text-sm text-muted-foreground">Capacity</p>
-                  <p className="font-medium">
-                    {selectedTableData.capacity} seats
-                  </p>
+                  <p className="font-medium">{selectedTableData.seats} seats</p>
                 </div>
-                {selectedTableData.updatedAt ? (
+                {selectedTableData.qr_code ? (
                   <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">Updated</p>
-                    <p className="font-medium">
-                      {formatDistanceToNow(
-                        new Date(selectedTableData.updatedAt),
-                        { addSuffix: true }
-                      )}
-                    </p>
+                    <p className="text-sm text-muted-foreground">QR Code</p>
+                    <p className="font-medium">{selectedTableData.qr_code}</p>
                   </div>
                 ) : null}
               </div>
@@ -235,7 +278,8 @@ export default function TablesPage() {
                   Close
                 </Button>
 
-                {selectedTableData.status === "Occupied" && (
+                {normalizeStatusLabel(selectedTableData.status) ===
+                  "Occupied" && (
                   <Button
                     className="flex-1"
                     onClick={() =>
@@ -246,7 +290,8 @@ export default function TablesPage() {
                   </Button>
                 )}
 
-                {selectedTableData.status === "Available" && (
+                {normalizeStatusLabel(selectedTableData.status) ===
+                  "Available" && (
                   <Button
                     className="flex-1"
                     onClick={() =>
@@ -286,7 +331,7 @@ export default function TablesPage() {
                         <div>
                           <div className="font-medium">Order #{order.id}</div>
                           <div className="text-xs text-muted-foreground">
-                            {order.status}
+                            {normalizeStatusLabel(order.status)}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">

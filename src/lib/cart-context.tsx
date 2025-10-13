@@ -1,139 +1,241 @@
+// lib/cart-context.tsx
 "use client";
 
-import {
+import React, {
   createContext,
+  useCallback,
   useContext,
-  useReducer,
-  ReactNode,
   useEffect,
+  useMemo,
+  useReducer,
+  useRef,
 } from "react";
 
-export interface CartItem {
-  id: number;
-  uniqueId: string; // unique ต่อเมนู+option
-  name: string;
-  price: number;
-  quantity: number;
-  options?: Record<string, string | number>;
-}
+export type ModifierChoice = { id: string; name: string; price: number };
 
-interface CartState {
+export type CartItem = {
+  uniqueId: string;
+  menuItemId: string;
+  name: string;
+  imageUrl?: string;
+  basePrice: number;
+  modifiers: ModifierChoice[];
+  note?: string;
+  quantity: number;
+};
+
+export type CartState = {
   items: CartItem[];
-  total: number;
-}
+  subtotal: number;
+  itemCount: number;
+};
+
+export type AddItemInput = {
+  menuItemId: string;
+  name: string;
+  imageUrl?: string;
+  basePrice: number;
+  modifiers?: ModifierChoice[];
+  note?: string;
+  quantity?: number;
+};
 
 type Action =
-  | { type: "ADD_ITEM"; payload: CartItem }
-  | { type: "UPDATE_QUANTITY"; payload: { uniqueId: string; quantity: number } }
-  | { type: "REMOVE_ITEM"; payload: { uniqueId: string } }
-  | { type: "CLEAR_CART" }
-  | { type: "SET_CART"; payload: CartState };
+  | { type: "HYDRATE"; items: CartItem[] }
+  | { type: "ADD"; item: CartItem }
+  | { type: "UPDATE_QTY"; uniqueId: string; quantity: number }
+  | { type: "REMOVE"; uniqueId: string }
+  | { type: "CLEAR" };
 
-interface CartContextType {
-  state: CartState;
-  addItem: (item: CartItem) => void;
-  updateQuantity: (uniqueId: string, quantity: number) => void;
-  removeItem: (uniqueId: string) => void;
-  clearCart: () => void;
-}
+const STORAGE_KEY = "pos.cart.v1";
+const INITIAL: CartState = { items: [], subtotal: 0, itemCount: 0 };
 
-const CartContext = createContext<CartContextType | undefined>(undefined);
+const normalizeNote = (s?: string) => (s || "").trim().toLowerCase();
+const uniqueIdOf = (
+  menuItemId: string,
+  modifiers: ModifierChoice[] = [],
+  note?: string
+) => {
+  const modKey = [...modifiers]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((m) => `${m.id}:${Number(m.price).toFixed(2)}`)
+    .join("|");
+  return `${menuItemId}__${modKey}__${normalizeNote(note)}`;
+};
 
-const cartReducer = (state: CartState, action: Action): CartState => {
+const unitPrice = (i: Omit<CartItem, "uniqueId">) =>
+  i.basePrice + (i.modifiers?.reduce((s, m) => s + (m.price || 0), 0) || 0);
+
+const recalc = (items: CartItem[]): CartState => {
+  const subtotal = items.reduce((s, i) => s + unitPrice(i) * i.quantity, 0);
+  const itemCount = items.reduce((s, i) => s + i.quantity, 0);
+  return { items, subtotal, itemCount };
+};
+
+function reducer(state: CartState, action: Action): CartState {
   switch (action.type) {
-    case "ADD_ITEM": {
-      const existingIndex = state.items.findIndex(
-        (i) => i.uniqueId === action.payload.uniqueId
-      );
-
-      let newItems;
-      if (existingIndex >= 0) {
-        newItems = [...state.items];
-        newItems[existingIndex].quantity += action.payload.quantity;
-      } else {
-        newItems = [...state.items, action.payload];
-      }
-
-      const newTotal = Number(
-        newItems.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2)
-      );
-
-      return { items: newItems, total: newTotal };
+    case "HYDRATE": {
+      return recalc(action.items || []);
     }
-
-    case "UPDATE_QUANTITY": {
-      const newItems = state.items.map((i) =>
-        i.uniqueId === action.payload.uniqueId
-          ? { ...i, quantity: Math.max(1, action.payload.quantity) }
-          : i
+    case "ADD": {
+      const idx = state.items.findIndex(
+        (x) => x.uniqueId === action.item.uniqueId
       );
-      const newTotal = Number(
-        newItems.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2)
-      );
-      return { items: newItems, total: newTotal };
+      const items =
+        idx >= 0
+          ? state.items.map((x, i) =>
+              i === idx
+                ? { ...x, quantity: x.quantity + action.item.quantity }
+                : x
+            )
+          : [...state.items, action.item];
+      return recalc(items);
     }
-
-    case "REMOVE_ITEM": {
-      const newItems = state.items.filter(
-        (i) => i.uniqueId !== action.payload.uniqueId
-      );
-      const newTotal = Number(
-        newItems.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2)
-      );
-      return { items: newItems, total: newTotal };
+    case "UPDATE_QTY": {
+      const items = state.items
+        .map((x) =>
+          x.uniqueId === action.uniqueId
+            ? { ...x, quantity: action.quantity }
+            : x
+        )
+        .filter((x) => x.quantity > 0);
+      return recalc(items);
     }
-
-    case "CLEAR_CART":
-      return { items: [], total: 0 };
-
-    case "SET_CART":
-      return action.payload;
-
+    case "REMOVE": {
+      return recalc(state.items.filter((x) => x.uniqueId !== action.uniqueId));
+    }
+    case "CLEAR": {
+      return INITIAL;
+    }
     default:
       return state;
   }
+}
+
+type Ctx = {
+  state: CartState;
+  items: CartItem[];
+  subtotal: number;
+  itemCount: number;
+  addItem: (input: AddItemInput) => void;
+  updateQty: (uniqueId: string, quantity: number) => void;
+  removeItem: (uniqueId: string) => void;
+  clearCart: () => void;
+  buildOrderPayload: (opts: {
+    channel: "DINEIN" | "TAKEAWAY";
+    tableId?: string | null;
+  }) => {
+    channel: string;
+    table_id?: string | null;
+    items: Array<{
+      menu_item_id: string;
+      quantity: number;
+      modifiers: { id: string }[];
+      note?: string;
+    }>;
+  };
 };
 
-export const CartProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0 });
+const CartContext = createContext<Ctx | null>(null);
 
-  // ✅ โหลดจาก localStorage เมื่อเปิดหน้า
+export const CartProvider: React.FC<React.PropsWithChildren> = ({
+  children,
+}) => {
+  const [state, dispatch] = useReducer(reducer, INITIAL);
+  const hydrated = useRef(false);
+
+  // hydrate
   useEffect(() => {
-    const saved = localStorage.getItem("cart");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        dispatch({ type: "SET_CART", payload: parsed });
-      } catch {
-        console.warn("Invalid cart data in storage");
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const items = Array.isArray(parsed?.items)
+          ? (parsed.items as CartItem[])
+          : [];
+        dispatch({ type: "HYDRATE", items });
       }
+    } catch (e) {
+      console.warn("cart hydrate failed", e);
+    } finally {
+      hydrated.current = true;
     }
   }, []);
 
-  // ✅ บันทึกลง localStorage ทุกครั้งที่มีการเปลี่ยนแปลง
+  // persist
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(state));
-  }, [state]);
+    if (!hydrated.current) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items }));
+    } catch (e) {
+      console.warn("cart persist failed", e);
+    }
+  }, [state.items]);
 
-  const addItem = (item: CartItem) =>
-    dispatch({ type: "ADD_ITEM", payload: item });
-  const updateQuantity = (uniqueId: string, quantity: number) =>
-    dispatch({ type: "UPDATE_QUANTITY", payload: { uniqueId, quantity } });
-  const removeItem = (uniqueId: string) =>
-    dispatch({ type: "REMOVE_ITEM", payload: { uniqueId } });
-  const clearCart = () => dispatch({ type: "CLEAR_CART" });
+  const addItem = useCallback((input: AddItemInput) => {
+    const modifiers = input.modifiers || [];
+    const uniqueId = uniqueIdOf(input.menuItemId, modifiers, input.note);
+    dispatch({
+      type: "ADD",
+      item: {
+        uniqueId,
+        menuItemId: input.menuItemId,
+        name: input.name,
+        imageUrl: input.imageUrl,
+        basePrice: Number(input.basePrice),
+        modifiers,
+        note: input.note,
+        quantity: Math.max(1, input.quantity || 1),
+      },
+    });
+  }, []);
 
-  return (
-    <CartContext.Provider
-      value={{ state, addItem, updateQuantity, removeItem, clearCart }}
-    >
-      {children}
-    </CartContext.Provider>
+  const updateQty = useCallback((uniqueId: string, quantity: number) => {
+    dispatch({ type: "UPDATE_QTY", uniqueId, quantity });
+  }, []);
+
+  const removeItem = useCallback((uniqueId: string) => {
+    dispatch({ type: "REMOVE", uniqueId });
+  }, []);
+
+  const clearCart = useCallback(() => {
+    dispatch({ type: "CLEAR" });
+  }, []);
+
+  const buildOrderPayload: Ctx["buildOrderPayload"] = useCallback(
+    (opts) => ({
+      channel: opts.channel,
+      table_id: opts.channel === "DINEIN" ? opts.tableId || null : null,
+      items: state.items.map((i) => ({
+        menu_item_id: i.menuItemId,
+        quantity: i.quantity,
+        modifiers: (i.modifiers || []).map((m) => ({ id: m.id })),
+        note: i.note || undefined,
+      })),
+    }),
+    [state.items]
   );
+
+  const value = useMemo<Ctx>(
+    () => ({
+      state,
+      items: state.items,
+      subtotal: state.subtotal,
+      itemCount: state.itemCount,
+      addItem,
+      updateQty,
+      removeItem,
+      clearCart,
+      buildOrderPayload,
+    }),
+    [state, addItem, updateQty, removeItem, clearCart, buildOrderPayload]
+  );
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };
 
 export const useCart = () => {
-  const context = useContext(CartContext);
-  if (!context) throw new Error("useCart must be used within a CartProvider");
-  return context;
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error("useCart must be used within CartProvider");
+  return ctx;
 };

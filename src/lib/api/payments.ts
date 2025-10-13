@@ -30,10 +30,18 @@ export async function getPaymentById(id: string) {
  * @param paymentData - Payment information to create
  * @returns Promise containing created payment data
  */
-export async function createPayment(paymentData: CreatePaymentRequest) {
-  return api.post("/v1/payments", paymentData);
+export async function createPayment(data: {
+  order_id: string;
+  method?: string;
+  amount_baht?: number;
+  provider?: string;
+  provider_ref?: string;
+}) {
+  if (process.env.NODE_ENV !== "production") {
+    console.log("POST /v1/payments payload:", data);
+  }
+  return api.post("/v1/payments", data);
 }
-
 /**
  * Get available payment methods
  * @returns Promise containing list of payment methods
