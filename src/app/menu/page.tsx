@@ -149,13 +149,14 @@ export default function MenuPage() {
   if (err) return <div className="p-6 text-red-600">{err}</div>;
 
   return (
-    <div className="mx-auto max-w-6xl p-6 space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Category filter */}
       {/* Category Segmented Pills */}
       <div
         role="tablist"
         aria-label="Filter categories"
-        className="flex items-center gap-2 overflow-x-auto py-1"
+        className="flex items-center gap-2 overflow-x-auto py-1 pb-2 scrollbar-hide"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         <button
           type="button"
@@ -168,6 +169,7 @@ export default function MenuPage() {
             "bg-white text-gray-700 border-gray-200",
             "shadow-sm hover:shadow transition-all hover:-translate-y-0.5",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500",
+            "flex-shrink-0",
             // state styles
             "data-[active=true]:bg-gray-600 data-[active=true]:text-white data-[active=true]:border-gray-600",
             "data-[active=true]:shadow-md data-[active=true]:shadow-gray-200",
@@ -197,6 +199,7 @@ export default function MenuPage() {
                 "bg-white text-gray-700 border-gray-200",
                 "shadow-sm hover:shadow transition-all hover:-translate-y-0.5",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500",
+                "flex-shrink-0",
                 // state styles
                 "data-[active=true]:bg-gray-600 data-[active=true]:text-white data-[active=true]:border-gray-600",
                 "data-[active=true]:shadow-md data-[active=true]:shadow-gray-200",
