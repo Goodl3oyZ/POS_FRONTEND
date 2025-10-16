@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+
+  // Enable standalone output for Docker/containers
+  output: "standalone",
+
   images: {
     unoptimized: true,
     domains: ["localhost"],

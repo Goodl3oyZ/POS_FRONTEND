@@ -49,10 +49,10 @@ export type {
 
 export type {
   // Orders types
-  OrderItem,
-  CreateOrderRequest,
-  AddItemToOrderRequest,
-  UpdateQuantityRequest,
+  OrderItemCamel,
+  OrderItemSnake,
+  CreateOrderCamel,
+  CreateOrderSnake,
 } from "./orders";
 
 export type {

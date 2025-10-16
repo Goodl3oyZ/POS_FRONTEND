@@ -1,0 +1,74 @@
+# ==============================================
+# Multi-stage Dockerfile for Next.js 14 POS Frontend
+# ==============================================
+
+# --- Stage 1: Dependencies ---
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Enable Corepack for pnpm
+RUN corepack enable
+
+# Copy dependency files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies using pnpm
+RUN pnpm install --frozen-lockfile
+
+# --- Stage 2: Builder ---
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Enable Corepack
+RUN corepack enable
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build arguments for environment variables
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_DEFAULT_TABLE_ID=TAKEAWAY
+
+# Set environment variables for build time
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_DEFAULT_TABLE_ID=$NEXT_PUBLIC_DEFAULT_TABLE_ID
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Build the application
+RUN pnpm build
+
+# --- Stage 3: Runner ---
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Enable Corepack
+RUN corepack enable
+
+# Copy built application
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/package.json ./package.json
+
+# Set correct permissions
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+# Start Next.js server
+CMD ["node", "server.js"]

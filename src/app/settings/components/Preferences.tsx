@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { Switch } from "@/components/ui/Switch";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/Select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
 import { Button } from "@/components/ui/button";
 
 export default function Preferences() {
@@ -36,22 +42,28 @@ Theme: ${theme}`);
 
       <div>
         <Label className="mb-1 block">Language</Label>
-        <Select
-          value={language}
-          onValueChange={setLanguage}
-          options={["English", "Thai"]}
-          placeholder="Select language"
-        />
+        <Select value={language} onValueChange={setLanguage}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select language" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="English">English</SelectItem>
+            <SelectItem value="Thai">Thai</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div>
         <Label className="mb-1 block">Theme</Label>
-        <Select
-          value={theme}
-          onValueChange={setTheme}
-          options={["Light", "Dark"]}
-          placeholder="Select theme"
-        />
+        <Select value={theme} onValueChange={setTheme}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select theme" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Light">Light</SelectItem>
+            <SelectItem value="Dark">Dark</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="pt-4">

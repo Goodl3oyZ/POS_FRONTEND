@@ -1,0 +1,38 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+# Note: Lock files are needed for Docker builds
+# pnpm-lock.yaml
+# package-lock.json
+
+# Next.js build output
+.next
+out
+
+# Environment files (don't copy to container)
+.env*.local
+.env.production
+.env.development
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.log
+README.md

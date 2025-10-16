@@ -1,0 +1,22 @@
+services:
+  pos-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_DEFAULT_TABLE_ID: ${NEXT_PUBLIC_DEFAULT_TABLE_ID:-TAKEAWAY}
+    container_name: pos-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_DEFAULT_TABLE_ID=${NEXT_PUBLIC_DEFAULT_TABLE_ID}
+    restart: unless-stopped
+    networks:
+      - pos-network
+
+networks:
+  pos-network:
+    driver: bridge

@@ -14,7 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Select } from "@/components/ui/Select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
 import { Loader2, UserPlus } from "lucide-react";
 
 export default function RegisterPage() {
@@ -207,9 +213,15 @@ export default function RegisterPage() {
                       formData.role === "staff" ? "พนักงาน" : "ผู้ดูแลระบบ"
                     }
                     onValueChange={handleRoleChange}
-                    options={["พนักงาน", "ผู้ดูแลระบบ"]}
-                    placeholder="เลือกตำแหน่ง"
-                  />
+                  >
+                    <SelectTrigger className="h-11 border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl transition-all duration-200">
+                      <SelectValue placeholder="เลือกตำแหน่ง" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="พนักงาน">พนักงาน</SelectItem>
+                      <SelectItem value="ผู้ดูแลระบบ">ผู้ดูแลระบบ</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </motion.div>
 
                 <motion.div
