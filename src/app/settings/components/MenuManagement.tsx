@@ -163,54 +163,103 @@ export default function MenuManagementPage() {
         />
       )}
 
-      {/* Menu Grid */}
+      {/* Menu Table */}
       {!addingMenu && !editingMenu && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {filteredMenuItems.map((menu) => (
-            <div key={menu.id} className="border p-4 rounded shadow relative">
-              <img
-                src={menu.image_url || "/images/foodImageHolder.jpg"}
-                alt={menu.name}
-                className="h-32 w-full object-cover rounded mb-2"
-              />
-              <h3 className="font-semibold text-lg">{menu.name}</h3>
-              <p className="text-sm text-gray-600">
-                SKU: {(menu as any).sku || "-"}
-              </p>
-              <p className="font-semibold text-green-600">฿{menu.price}</p>
-              <p className="text-xs text-gray-500">
-                Category: {(menu as any).categoryName || "-"}
-              </p>
-              <span
-                className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs ${
-                  menu.active !== false
-                    ? "bg-green-100 text-green-800"
-                    : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                {menu.active !== false ? "Active" : "Inactive"}
-              </span>
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                    Image
+                  </th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                    SKU
+                  </th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                    Category
+                  </th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                    Price
+                  </th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-right font-semibold text-gray-700">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredMenuItems.map((menu) => (
+                  <tr
+                    key={menu.id}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <img
+                        src={menu.image_url || "/images/foodImageHolder.jpg"}
+                        alt={menu.name}
+                        className="h-16 w-16 object-cover rounded"
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-gray-900">
+                        {menu.name}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">
+                      {(menu as any).sku || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">
+                      {(menu as any).categoryName || "-"}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-green-600">
+                        ฿{menu.price}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          menu.active !== false
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {menu.active !== false ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                          onClick={() => setEditingMenu(menu)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                          onClick={() => handleDeleteMenu(menu.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-              <div className="flex space-x-2 mt-2">
-                <button
-                  className="px-2 py-1 bg-blue-500 text-white rounded"
-                  onClick={() => setEditingMenu(menu)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="px-2 py-1 bg-red-500 text-white rounded"
-                  onClick={() => handleDeleteMenu(menu.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+          {/* Empty State */}
           {filteredMenuItems.length === 0 && (
-            <p className="text-gray-500 col-span-full">
-              No menus in this category
-            </p>
+            <div className="text-center py-12">
+              <p className="text-gray-500">No menu items in this category</p>
+            </div>
           )}
         </div>
       )}
