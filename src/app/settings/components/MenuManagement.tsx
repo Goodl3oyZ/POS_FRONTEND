@@ -1,39 +1,103 @@
 "use client";
-import { useState } from "react";
-import { MenuItem, menuItems as initialMenuItems } from "@/lib/data";
+import { useState, useEffect } from "react";
+import {
+  MenuItem,
+  getMenuItems,
+  createMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
+  CreateMenuItemRequest,
+} from "@/lib/api/menu-items";
 import AddMenuForm from "@/components/ui/AddMenuForm";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 export default function MenuManagementPage() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null);
   const [addingMenu, setAddingMenu] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [loading, setLoading] = useState(true);
 
-  const categories = [
-    "All",
-    ...Array.from(new Set(menuItems.map((m) => m.category))),
-  ];
+  useEffect(() => {
+    fetchMenuItems();
+  }, []);
 
-  const handleSaveMenu = (menu: MenuItem) => {
-    if (editingMenu) {
-      setMenuItems((prev) => prev.map((m) => (m.id === menu.id ? menu : m)));
-      setEditingMenu(null);
-    } else {
-      setMenuItems((prev) => [...prev, menu]);
-      setAddingMenu(false);
+  const fetchMenuItems = async () => {
+    setLoading(true);
+    try {
+      const items = await getMenuItems();
+      setMenuItems(items);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to load menu items");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteMenu = (id: number) => {
+  const categories = [
+    "All",
+    ...Array.from(
+      new Set(
+        menuItems.map((m) => m.categoryId).filter((c): c is string => !!c)
+      )
+    ),
+  ];
+
+  const handleSaveMenu = async (menu: any) => {
+    try {
+      if (editingMenu) {
+        // Update existing menu
+        await updateMenuItem(editingMenu.id, {
+          name: menu.name,
+          price: menu.price,
+          description: menu.description,
+          modifiers: menu.modifiers,
+        });
+        toast.success("Menu updated successfully!");
+        setEditingMenu(null);
+      } else {
+        // Create new menu
+        await createMenuItem({
+          name: menu.name,
+          price: menu.price,
+          categoryId: menu.categoryId,
+          description: menu.description,
+          modifiers: menu.modifiers,
+        });
+        toast.success("Menu created successfully!");
+        setAddingMenu(false);
+      }
+      fetchMenuItems();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to save menu");
+    }
+  };
+
+  const handleDeleteMenu = async (id: string) => {
     if (confirm("Are you sure to delete this menu?")) {
-      setMenuItems((prev) => prev.filter((m) => m.id !== id));
+      try {
+        await deleteMenuItem(id);
+        toast.success("Menu deleted successfully!");
+        fetchMenuItems();
+      } catch (error: any) {
+        toast.error(error.response?.data?.message || "Failed to delete menu");
+      }
     }
   };
 
   const filteredMenuItems =
     selectedCategory === "All"
       ? menuItems
-      : menuItems.filter((m) => m.category === selectedCategory);
+      : menuItems.filter((m) => m.categoryId === selectedCategory);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -75,7 +139,18 @@ export default function MenuManagementPage() {
       {/* Edit Menu Form */}
       {editingMenu && (
         <AddMenuForm
-          menu={editingMenu}
+          menu={
+            {
+              id: editingMenu.id,
+              name: editingMenu.name,
+              price: editingMenu.price,
+              description: editingMenu.description || "",
+              category: editingMenu.categoryId || "",
+              image: editingMenu.image_url || "",
+              options: [],
+              extras: [],
+            } as any
+          }
           onSave={handleSaveMenu}
           onCancel={() => setEditingMenu(null)}
         />
@@ -87,13 +162,16 @@ export default function MenuManagementPage() {
           {filteredMenuItems.map((menu) => (
             <div key={menu.id} className="border p-4 rounded shadow relative">
               <img
-                src={menu.image}
+                src={menu.image_url || "/images/foodImageHolder.jpg"}
                 alt={menu.name}
                 className="h-32 w-full object-cover rounded mb-2"
               />
               <h3 className="font-semibold text-lg">{menu.name}</h3>
-              <p>Price: ${menu.price}</p>
-              <p>Category: {menu.category}</p>
+              <p>Price: ฿{menu.price}</p>
+              <p>Category: {menu.categoryId || "-"}</p>
+              {menu.description && (
+                <p className="text-sm text-gray-600 mt-1">{menu.description}</p>
+              )}
 
               <div className="flex space-x-2 mt-2">
                 <button
