@@ -39,38 +39,48 @@ export default function MenuManagementPage() {
     "All",
     ...Array.from(
       new Set(
-        menuItems.map((m) => m.categoryId).filter((c): c is string => !!c)
+        menuItems
+          .map((m) => (m as any).categoryName)
+          .filter((c): c is string => !!c)
       )
     ),
   ];
 
-  const handleSaveMenu = async (menu: any) => {
+  const handleSaveMenu = async (menu: any, imageFile?: File | null) => {
     try {
       if (editingMenu) {
         // Update existing menu
         await updateMenuItem(editingMenu.id, {
           name: menu.name,
           price: menu.price,
-          description: menu.description,
-          modifiers: menu.modifiers,
+          sku: menu.sku,
+          active: menu.active,
+          image: imageFile || undefined, // Only include if provided
         });
         toast.success("Menu updated successfully!");
         setEditingMenu(null);
       } else {
         // Create new menu
+        if (!menu.category) {
+          toast.error("Please select a category");
+          return;
+        }
         await createMenuItem({
           name: menu.name,
           price: menu.price,
-          categoryId: menu.categoryId,
-          description: menu.description,
-          modifiers: menu.modifiers,
+          categoryId: menu.category,
+          sku: menu.sku,
+          active: menu.active !== false, // Default to true
+          image: imageFile || undefined, // Optional image
         });
         toast.success("Menu created successfully!");
         setAddingMenu(false);
       }
       fetchMenuItems();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to save menu");
+      const errorMessage =
+        error.message || error.response?.data?.message || "Failed to save menu";
+      toast.error(errorMessage);
     }
   };
 
@@ -89,7 +99,7 @@ export default function MenuManagementPage() {
   const filteredMenuItems =
     selectedCategory === "All"
       ? menuItems
-      : menuItems.filter((m) => m.categoryId === selectedCategory);
+      : menuItems.filter((m) => (m as any).categoryName === selectedCategory);
 
   if (loading) {
     return (
@@ -139,18 +149,15 @@ export default function MenuManagementPage() {
       {/* Edit Menu Form */}
       {editingMenu && (
         <AddMenuForm
-          menu={
-            {
-              id: editingMenu.id,
-              name: editingMenu.name,
-              price: editingMenu.price,
-              description: editingMenu.description || "",
-              category: editingMenu.categoryId || "",
-              image: editingMenu.image_url || "",
-              options: [],
-              extras: [],
-            } as any
-          }
+          menu={{
+            id: editingMenu.id,
+            name: editingMenu.name,
+            price: editingMenu.price,
+            category: editingMenu.categoryId || "",
+            sku: (editingMenu as any).sku,
+            active: editingMenu.active !== false,
+            image: editingMenu.image_url || "",
+          }}
           onSave={handleSaveMenu}
           onCancel={() => setEditingMenu(null)}
         />
@@ -167,11 +174,22 @@ export default function MenuManagementPage() {
                 className="h-32 w-full object-cover rounded mb-2"
               />
               <h3 className="font-semibold text-lg">{menu.name}</h3>
-              <p>Price: ฿{menu.price}</p>
-              <p>Category: {menu.categoryId || "-"}</p>
-              {menu.description && (
-                <p className="text-sm text-gray-600 mt-1">{menu.description}</p>
-              )}
+              <p className="text-sm text-gray-600">
+                SKU: {(menu as any).sku || "-"}
+              </p>
+              <p className="font-semibold text-green-600">฿{menu.price}</p>
+              <p className="text-xs text-gray-500">
+                Category: {(menu as any).categoryName || "-"}
+              </p>
+              <span
+                className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs ${
+                  menu.active !== false
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
+                }`}
+              >
+                {menu.active !== false ? "Active" : "Inactive"}
+              </span>
 
               <div className="flex space-x-2 mt-2">
                 <button

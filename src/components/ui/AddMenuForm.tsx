@@ -1,11 +1,29 @@
 "use client";
 import { useState, useEffect } from "react";
-import { MenuItem, MenuOption, ExtraItem } from "@/lib/data";
-import CategorySelect from "@/components/ui/CategorySelect";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { validateImage, getAllCategories } from "@/lib/api";
+import { Loader2 } from "lucide-react";
+
+interface MenuFormData {
+  id?: string;
+  name: string;
+  price: number;
+  category: string;
+  sku?: string;
+  active?: boolean;
+  image?: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
 
 interface AddMenuFormProps {
-  menu?: MenuItem; // ถ้ามี = edit mode
-  onSave: (menu: MenuItem) => void;
+  menu?: MenuFormData;
+  onSave: (menu: MenuFormData, imageFile?: File | null) => void;
   onCancel: () => void;
 }
 
@@ -15,223 +33,232 @@ export default function AddMenuForm({
   onCancel,
 }: AddMenuFormProps) {
   const [name, setName] = useState(menu?.name || "");
+  const [sku, setSku] = useState(menu?.sku || "");
   const [price, setPrice] = useState(menu?.price?.toString() || "");
-  const [description, setDescription] = useState(menu?.description || "");
-  const [category, setCategory] = useState(menu?.category || "");
-  const [options, setOptions] = useState<MenuOption[]>(menu?.options || []);
-  const [extras, setExtras] = useState<ExtraItem[]>(menu?.extras || []);
+  const [categoryId, setCategoryId] = useState(menu?.category || "");
+  const [active, setActive] = useState(menu?.active !== false); // Default true
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(menu?.image || "");
+  const [imageError, setImageError] = useState<string>("");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // ถ้า menu เปลี่ยน รีเซ็ต state
   useEffect(() => {
-    setName(menu?.name || "");
-    setPrice(menu?.price?.toString() || "");
-    setDescription(menu?.description || "");
-    setCategory(menu?.category || "");
-    setOptions(menu?.options || []);
-    setExtras(menu?.extras || []);
-    setImagePreview(menu?.image || "");
-    setImageFile(null);
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    if (menu) {
+      setName(menu.name || "");
+      setSku(menu.sku || "");
+      setPrice(menu.price?.toString() || "");
+      setCategoryId(menu.category || "");
+      setActive(menu.active !== false);
+      setImagePreview(menu.image || "");
+      setImageFile(null);
+    }
   }, [menu]);
 
-  const handleAddOption = () =>
-    setOptions([...options, { name: "", choices: [] }]);
-  const handleAddChoice = (optIndex: number) => {
-    const newOptions = [...options];
-    newOptions[optIndex].choices.push({ label: "", price: "" as any });
-    setOptions(newOptions);
+  const fetchCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const response = await getAllCategories();
+      setCategories(response.data);
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+    } finally {
+      setLoadingCategories(false);
+    }
   };
-  const handleAddExtra = () =>
-    setExtras([...extras, { label: "", price: "" as any }]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setImageError("");
+
+    if (file) {
+      // Validate image
+      const error = validateImage(file);
+      if (error) {
+        setImageError(error);
+        setImageFile(null);
+        setImagePreview("");
+        e.target.value = ""; // Reset input
+        return;
+      }
+
+      setImageFile(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSave = () => {
-    if (!name || !price || !category) {
-      alert("Please fill in menu name, price, and category!");
+    // Validation
+    if (!name.trim()) {
+      alert("Please enter menu name");
+      return;
+    }
+    if (!price || Number(price) <= 0) {
+      alert("Please enter valid price");
+      return;
+    }
+    if (!categoryId) {
+      alert("Please select a category");
       return;
     }
 
-    const newMenu: MenuItem = {
-      id: menu?.id || Date.now(),
-      name,
+    const menuData: MenuFormData = {
+      id: menu?.id,
+      name: name.trim(),
       price: Number(price),
-      description,
-      image: imageFile ? imageFile.name : imagePreview,
-      category,
-      options: options.map((opt) => ({
-        ...opt,
-        choices: opt.choices.map((c) => ({
-          ...c,
-          price: Number(c.price),
-        })),
-      })),
-      extras: extras.map((e) => ({ ...e, price: Number(e.price) })),
+      category: categoryId,
+      sku: sku.trim() || undefined,
+      active,
     };
 
-    onSave(newMenu);
+    onSave(menuData, imageFile);
   };
 
   return (
-    <div className="p-4 space-y-4 border rounded shadow-md bg-white">
-      <h2 className="text-xl font-semibold">
-        {menu ? "Edit Menu Item" : "Add Menu Item"}
-      </h2>
+    <div className="p-6 space-y-6 border rounded-lg shadow-md bg-white">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold">
+          {menu ? "Edit Menu Item" : "Add Menu Item"}
+        </h2>
+        <Button variant="ghost" onClick={onCancel}>
+          ✕
+        </Button>
+      </div>
 
-      <input
-        type="text"
-        placeholder="Menu Name"
-        className="border rounded px-3 py-2 w-full"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
+      <div className="space-y-4">
+        {/* Name */}
+        <div className="space-y-2">
+          <Label htmlFor="name">
+            Name <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter menu name (e.g., ข้าวหมูกรอบพริกเกลือ)"
+            required
+          />
+        </div>
 
-      <input
-        type="text"
-        placeholder="Price"
-        className="border rounded px-3 py-2 w-full"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-      />
+        {/* SKU */}
+        <div className="space-y-2">
+          <Label htmlFor="sku">SKU</Label>
+          <Input
+            id="sku"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+            placeholder="Enter SKU (e.g., MOU-ASD-PRI-3)"
+          />
+        </div>
 
-      <input
-        type="text"
-        placeholder="Description"
-        className="border rounded px-3 py-2 w-full"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
+        {/* Price */}
+        <div className="space-y-2">
+          <Label htmlFor="price">
+            Price (฿) <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="price"
+            type="number"
+            min="0"
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Enter price in Baht (e.g., 70)"
+            required
+          />
+        </div>
 
-      {/* Image Upload */}
-      <input
-        type="file"
-        accept="image/*"
-        className="border rounded px-3 py-2 w-full"
-        onChange={(e) => {
-          const file = e.target.files?.[0] || null;
-          setImageFile(file);
-          if (file) setImagePreview(URL.createObjectURL(file));
-        }}
-      />
-      {imagePreview && (
-        <img
-          src={imagePreview}
-          alt="Preview"
-          className="mt-2 h-32 w-32 object-cover rounded"
-        />
-      )}
-
-      {/* Category */}
-      <CategorySelect onSelect={setCategory} />
-
-      {/* Options */}
-      <div className="space-y-2">
-        <h3 className="font-semibold">Options</h3>
-        {options.map((opt, i) => (
-          <div key={i} className="border p-2 rounded space-y-2">
-            <input
-              type="text"
-              placeholder="Option Name"
-              className="border rounded px-3 py-1 w-full"
-              value={opt.name}
-              onChange={(e) => {
-                const newOptions = [...options];
-                newOptions[i].name = e.target.value;
-                setOptions(newOptions);
-              }}
-            />
-            {opt.choices.map((choice, ci) => (
-              <div key={ci} className="flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="Choice Label"
-                  className="border rounded px-3 py-1 flex-1"
-                  value={choice.label}
-                  onChange={(e) => {
-                    const newOptions = [...options];
-                    newOptions[i].choices[ci].label = e.target.value;
-                    setOptions(newOptions);
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Price"
-                  className="border rounded px-3 py-1 w-24"
-                  value={choice.price}
-                  onChange={(e) => {
-                    const newOptions = [...options];
-                    newOptions[i].choices[ci].price = e.target.value as any;
-                    setOptions(newOptions);
-                  }}
-                />
-              </div>
-            ))}
-            <button
-              className="px-3 py-1 bg-blue-500 text-white rounded"
-              onClick={() => handleAddChoice(i)}
+        {/* Category */}
+        <div className="space-y-2">
+          <Label htmlFor="category">
+            Category <span className="text-red-500">*</span>
+          </Label>
+          {loadingCategories ? (
+            <div className="flex items-center gap-2 p-2 border rounded">
+              <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+              <span className="text-sm text-gray-500">
+                Loading categories...
+              </span>
+            </div>
+          ) : (
+            <select
+              id="category"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
             >
-              Add Choice
-            </button>
-          </div>
-        ))}
-        <button
-          className="px-3 py-1 bg-blue-500 text-white rounded"
-          onClick={handleAddOption}
-        >
-          Add Option
-        </button>
+              <option value="">Select a category...</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Active Status */}
+        <div className="flex items-center space-x-2">
+          <input
+            id="active"
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+          />
+          <Label htmlFor="active" className="cursor-pointer">
+            Active (available for ordering)
+          </Label>
+        </div>
+
+        {/* Image Upload */}
+        <div className="space-y-2">
+          <Label htmlFor="image">Image</Label>
+          <Input
+            id="image"
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+            onChange={handleImageChange}
+            className="cursor-pointer"
+          />
+          <p className="text-xs text-gray-500">
+            JPG, PNG, GIF, or WEBP. Max 5MB. Optional.
+          </p>
+          {imageError && <p className="text-xs text-red-600">{imageError}</p>}
+
+          {/* Image Preview */}
+          {imagePreview && (
+            <div className="mt-2">
+              <p className="text-xs text-gray-600 mb-2">Preview:</p>
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="h-40 w-auto object-cover rounded border"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Extras */}
-      <div className="space-y-2">
-        <h3 className="font-semibold">Extras</h3>
-        {extras.map((extra, i) => (
-          <div key={i} className="flex space-x-2">
-            <input
-              type="text"
-              placeholder="Extra Label"
-              className="border rounded px-3 py-1 flex-1"
-              value={extra.label}
-              onChange={(e) => {
-                const newExtras = [...extras];
-                newExtras[i].label = e.target.value;
-                setExtras(newExtras);
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Price"
-              className="border rounded px-3 py-1 w-24"
-              value={extra.price}
-              onChange={(e) => {
-                const newExtras = [...extras];
-                newExtras[i].price = e.target.value as any;
-                setExtras(newExtras);
-              }}
-            />
-          </div>
-        ))}
-        <button
-          className="px-3 py-1 bg-green-500 text-white rounded"
-          onClick={handleAddExtra}
-        >
-          Add Extra
-        </button>
-      </div>
-
-      {/* Actions */}
-      <div className="flex space-x-2">
-        <button
-          className="px-4 py-2 bg-indigo-600 text-white rounded"
-          onClick={handleSave}
-        >
-          Save
-        </button>
-        <button
-          className="px-4 py-2 bg-gray-400 text-white rounded"
-          onClick={onCancel}
-        >
+      {/* Action Buttons */}
+      <div className="flex items-center justify-end gap-3 pt-4 border-t">
+        <Button variant="outline" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
+        <Button onClick={handleSave}>
+          {menu ? "Update Menu" : "Create Menu"}
+        </Button>
       </div>
     </div>
   );

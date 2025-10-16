@@ -41,6 +41,11 @@ export type {
   UpdateMenuItemRequest,
 } from "./menu-items";
 
+export {
+  // Menu Items helpers
+  validateImage,
+} from "./menu-items";
+
 export type {
   // Modifiers types
   CreateModifierRequest,
