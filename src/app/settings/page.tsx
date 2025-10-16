@@ -26,6 +26,7 @@ import StoreInformation from "./components/StoreInformation";
 import UserManagement from "./components/UserManagement";
 import TableManagement from "./components/TableManagement";
 import MenuManagement from "./components/MenuManagement";
+import MenuStatistics from "./components/MenuStatistics";
 import PricingDiscounts from "./components/PricingDiscounts";
 // import SalesReports from "./components/SalesReports";
 import Preferences from "./components/Preferences";
@@ -43,6 +44,7 @@ const settingsGroups = [
     title: "Menu & Orders",
     items: [
       { icon: BookOpen, title: "Menu Management" },
+      { icon: BarChart3, title: "Menu Statistics" },
       { icon: BadgeDollarSign, title: "Pricing & Discounts" },
       // { icon: BarChart3, title: "Sales Reports" },
     ],
@@ -59,6 +61,7 @@ const settingComponents: Record<string, React.FC> = {
   "User Management": UserManagement,
   "Table Management": TableManagement,
   "Menu Management": MenuManagement,
+  "Menu Statistics": MenuStatistics,
   "Pricing & Discounts": PricingDiscounts,
   // "Sales Reports": SalesReports,
   Preferences,

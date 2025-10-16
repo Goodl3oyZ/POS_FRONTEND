@@ -46,6 +46,9 @@ export {
   validateImage,
 } from "./menu-items";
 
+// Menu Statistics
+export * from "./menu-statistics";
+
 export type {
   // Modifiers types
   CreateModifierRequest,
