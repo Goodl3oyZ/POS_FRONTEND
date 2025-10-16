@@ -7,11 +7,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import { Button } from "@/components/ui/button";
+import UserInfoDialog from "@/components/ui/UserInfoDialog";
+import { useState } from "react";
 
 export function Topbar() {
   const { user, logout } = useAuth();
   const cart = useCart();
   const router = useRouter();
+  const [showUserInfo, setShowUserInfo] = useState(false);
 
   const cartItems = (cart as any)?.state?.items ?? (cart as any)?.items ?? [];
   const cartQty = Array.isArray(cartItems)
@@ -63,20 +66,26 @@ export function Topbar() {
           ) : (
             // Logged in → show user info + logout
             <>
-              <div className="hidden max-w-[14rem] items-center gap-2 sm:flex">
+              <button
+                onClick={() => setShowUserInfo(true)}
+                className="hidden max-w-[14rem] items-center gap-2 sm:flex hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors"
+              >
                 <UserCircle className="h-6 w-6 text-gray-600" />
                 <div className="truncate text-right">
                   <p className="truncate text-sm font-medium">
                     {user.user.full_name}
                   </p>
                 </div>
-              </div>
-              <div className="sm:hidden">
+              </button>
+              <button
+                onClick={() => setShowUserInfo(true)}
+                className="sm:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
                 <UserCircle
                   className="h-6 w-6 text-gray-600"
                   aria-hidden="true"
                 />
-              </div>
+              </button>
 
               <Button
                 variant="ghost"
@@ -92,6 +101,15 @@ export function Topbar() {
           )}
         </div>
       </div>
+
+      {/* User Info Dialog */}
+      {user && (
+        <UserInfoDialog
+          open={showUserInfo}
+          onOpenChange={setShowUserInfo}
+          user={user}
+        />
+      )}
     </header>
   );
 }

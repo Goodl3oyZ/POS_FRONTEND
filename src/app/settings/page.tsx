@@ -23,7 +23,7 @@ import {
 
 // import components ของแต่ละ setting
 import StoreInformation from "./components/StoreInformation";
-// import StaffManagement from "./components/StaffManagement";
+import UserManagement from "./components/UserManagement";
 import TableManagement from "./components/TableManagement";
 import MenuManagement from "./components/MenuManagement";
 import PricingDiscounts from "./components/PricingDiscounts";
@@ -35,7 +35,7 @@ const settingsGroups = [
     title: "Business",
     items: [
       { icon: Store, title: "Store Information" },
-      // { icon: Users, title: "Staff Management" },
+      { icon: Users, title: "User Management" },
       { icon: Table, title: "Table Management" },
     ],
   },
@@ -56,7 +56,7 @@ const settingsGroups = [
 // map ชื่อ Setting -> Component
 const settingComponents: Record<string, React.FC> = {
   "Store Information": StoreInformation,
-  // "Staff Management": StaffManagement,
+  "User Management": UserManagement,
   "Table Management": TableManagement,
   "Menu Management": MenuManagement,
   "Pricing & Discounts": PricingDiscounts,
@@ -92,7 +92,7 @@ export default function SettingsPage() {
                   className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
                   onClick={() => setSelectedSetting(item.title)}
                 >
-                  <div className="flex items-staSales Reportsrt space-x-4">
+                  <div className="flex items-start space-x-4">
                     <Icon className="h-6 w-6 text-blue-600 mt-1" />
                     <div className="flex-1">
                       <h4 className="font-medium mb-1">{item.title}</h4>
@@ -113,7 +113,7 @@ export default function SettingsPage() {
         open={!!selectedSetting}
         onOpenChange={() => setSelectedSetting(null)}
       >
-        <DialogContent className="w-full max-w-4xl h-[90vh] p-6 rounded-xl bg-white shadow-xl overflow-auto">
+        <DialogContent className="w-full max-w-7xl h-[90vh] p-6 rounded-xl bg-white shadow-xl overflow-auto">
           <div className="mb-4">
             <h2 className="text-2xl font-semibold">{selectedSetting}</h2>
           </div>

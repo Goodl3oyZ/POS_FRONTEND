@@ -4,21 +4,21 @@ import { api } from "./config";
 export interface CreateUserRequest {
   username: string;
   password: string;
-  fullName?: string;
+  full_name?: string;
   email?: string;
   phone?: string;
-  roleIds?: string[];
+  status?: string;
 }
 
 export interface UpdateUserRequest {
-  fullName?: string;
+  full_name?: string;
   email?: string;
   phone?: string;
   status?: string;
 }
 
 export interface AssignRolesRequest {
-  roleIds: string[];
+  role_id: number;
 }
 
 /**
