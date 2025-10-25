@@ -2,7 +2,7 @@ services:
   pos-frontend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile #ระบุชื่อไฟล์Dockerfileที่จะใช้
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
         NEXT_PUBLIC_DEFAULT_TABLE_ID: ${NEXT_PUBLIC_DEFAULT_TABLE_ID:-TAKEAWAY}
