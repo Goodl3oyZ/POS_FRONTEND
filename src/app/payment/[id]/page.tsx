@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { getPaymentById } from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
+import { transformImageUrl } from "@/lib/utils/image-url";
 
 export default function PaymentStatusPage() {
   const { id } = useParams<{ id: string }>();
@@ -120,7 +121,7 @@ export default function PaymentStatusPage() {
           <CardContent>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={payment.qr_image_url}
+              src={transformImageUrl(payment.qr_image_url) || ""}
               alt="Payment QR"
               className="mx-auto max-w-xs"
             />

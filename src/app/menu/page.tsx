@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { transformImageUrl } from "@/lib/utils/image-url";
 
 interface Modifier {
   id: string;
@@ -136,7 +137,7 @@ export default function MenuPage() {
     addItem({
       menuItemId: String(activeMenu.id),
       name: activeMenu.name,
-      imageUrl: activeMenu.image_url,
+      imageUrl: transformImageUrl(activeMenu.image_url),
       basePrice: activeMenu.price_baht,
       modifiers: selectedForCart,
       note,
@@ -227,7 +228,7 @@ export default function MenuPage() {
             <CardContent className="p-4 space-y-3">
               {m.image_url ? (
                 <img
-                  src={m.image_url}
+                  src={transformImageUrl(m.image_url)}
                   alt={m.name}
                   className="h-40 w-full rounded-xl object-cover"
                 />

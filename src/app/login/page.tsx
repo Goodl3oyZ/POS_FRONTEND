@@ -230,7 +230,7 @@ export default function LoginPage() {
               <p className="text-xs text-gray-500">
                 Demo credentials:{" "}
                 <span className="font-semibold text-gray-700">
-                  admin / password
+                  owner / owner
                 </span>
               </p>
             </div>

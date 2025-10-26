@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Minus, Plus } from "lucide-react";
 import { getMenuItemById } from "@/lib/api"; // API ของคุณ (ต้องคืนรูปแบบเหมือนตัวอย่าง JSON)
 import { useCart } from "@/lib/cart-context";
+import { transformImageUrl } from "@/lib/utils/image-url";
 
 /** ===== Types ===== */
 interface Modifier {
@@ -103,7 +104,7 @@ export default function MenuItemDetailPage() {
     addItem({
       menuItemId: String(item.id),
       name: item.name,
-      imageUrl: item.image_url,
+      imageUrl: transformImageUrl(item.image_url),
       basePrice: item.price_baht,
       modifiers: selectedMods,
       note: customNote,
@@ -142,7 +143,7 @@ export default function MenuItemDetailPage() {
           <div className="relative h-64 w-full bg-gray-100">
             {item.image_url ? (
               <Image
-                src={item.image_url}
+                src={transformImageUrl(item.image_url) || ""}
                 alt={item.name}
                 width={800}
                 height={400}

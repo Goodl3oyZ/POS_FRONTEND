@@ -11,6 +11,7 @@ import {
 import AddMenuForm from "@/components/ui/AddMenuForm";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { transformImageUrl } from "@/lib/utils/image-url";
 
 export default function MenuManagementPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -201,7 +202,10 @@ export default function MenuManagementPage() {
                   >
                     <td className="px-6 py-4">
                       <img
-                        src={menu.image_url || "/images/foodImageHolder.jpg"}
+                        src={
+                          transformImageUrl(menu.image_url) ||
+                          "/images/foodImageHolder.jpg"
+                        }
                         alt={menu.name}
                         className="h-16 w-16 object-cover rounded"
                       />
